@@ -53,7 +53,7 @@ export function UploadInput({
 
   return (
     <div className="flex flex-col items-center justify-center w-full">
-      <UploadDropzone<OurFileRouter, { name: string; url: string; size: number }[]> // Pass the correct generic types
+      <UploadDropzone<OurFileRouter, "meetingUploader">
         endpoint="meetingUploader"
         onClientUploadComplete={handleUploadComplete}
         onUploadError={handleUploadError}
