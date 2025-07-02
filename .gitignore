@@ -1,0 +1,139 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
+.env
+
+# Vercel
+.vercel
+
+# Local development
+uploads/
+exports/
+
+# IDE
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# typescript build artifacts
+*.tsbuildinfo
+
+# next.js build output
+.next
+
+# next.js cache
+.next/cache
+
+# next.js build trace
+.next/trace
+
+# next.js serverless build output
+.next/serverless
+
+# next.js static build output
+.next/static
+
+# next.js development server output
+.next/development-server
+
+# next.js production server output
+.next/production-server
+
+# next.js build manifest
+.next/build-manifest.json
+
+# next.js react loadable manifest
+.next/react-loadable-manifest.json
+
+# next.js font manifest
+.next/font-manifest.json
+
+# next.js image manifest
+.next/image-manifest.json
+
+# next.js middleware manifest
+.next/middleware-manifest.json
+
+# next.js routes manifest
+.next/routes-manifest.json
+
+# next.js server build information
+.next/server
+
+# next.js static build information
+.next/static
+
+# next.js trace files
+.next/trace
+
+# next.js package.json
+.next/package.json
+
+# next.js yarn.lock
+.next/yarn.lock
+
+# next.js pnpm-lock.yaml
+.next/pnpm-lock.yaml
+
+# next.js node_modules
+.next/node_modules
+
+# next.js cache directory
+.next/cache
+
+# next.js build directory
+.next/build
+
+# next.js development directory
+.next/development
+
+# next.js production directory
+.next/production
+
+# next.js server directory
+.next/server
+
+# next.js static directory
+.next/static
+
+# next.js trace directory
+.next/trace
+
+# next.js package.json file
+.next/package.json
+
+# next.js yarn.lock file
+.next/yarn.lock
+
+# next.js pnpm-lock.yaml file
+.next/pnpm-lock.yaml
+
+# next.js node_modules directory
+.next/node_modules
