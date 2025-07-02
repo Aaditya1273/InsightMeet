@@ -47,9 +47,9 @@ export function UploadInput({
 
   return (
     <div className="flex flex-col items-center justify-center w-full">
-      <UploadDropzone<OurFileRouter>
-        endpoint="mediaUploader" // Replace with your actual endpoint name
-        onClientUploadComplete={handleUploadComplete}
+      <UploadDropzone<OurFileRouter> // Pass the generic types here
+        endpoint="meetingUploader" // Corrected endpoint name
+        onClientUploadComplete={(res) => handleUploadComplete(res as { name: string; url: string; size: number }[])}
         onUploadError={handleUploadError}
         onUploadBegin={() => {
           setUploading(true);
