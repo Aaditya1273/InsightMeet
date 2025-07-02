@@ -1,6 +1,12 @@
 import { UploadButton, UploadDropzone } from "@uploadthing/react";
 import { useState, useCallback } from 'react';
-import { OurFileRouter } from "@/app/api/uploadthing/core"; // Assuming your UploadThing config is here
+import { OurFileRouter } from "../app/api/uploadthing/core"; // Corrected import path
+
+interface UploadedFile {
+  name: string;
+  url: string;
+  size: number;
+}
 
 interface UploadInputProps {
   onUploadSuccess?: (files: { name: string; url: string; size: number }[]) => void;
@@ -47,9 +53,9 @@ export function UploadInput({
 
   return (
     <div className="flex flex-col items-center justify-center w-full">
-      <UploadDropzone<OurFileRouter> // Pass the generic types here
-        endpoint="meetingUploader" // Corrected endpoint name
-        onClientUploadComplete={(res) => handleUploadComplete(res as { name: string; url: string; size: number }[])}
+      <UploadDropzone<OurFileRouter, { name: string; url: string; size: number }[]> // Pass the correct generic types
+        endpoint="meetingUploader"
+        onClientUploadComplete={handleUploadComplete}
         onUploadError={handleUploadError}
         onUploadBegin={() => {
           setUploading(true);

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { callHuggingFace, parseHuggingFaceResponse, getModelConfig } from './huggingface';
 
 // Schema for the summary response
 export const summarySchema = z.object({
@@ -9,26 +10,7 @@ export const summarySchema = z.object({
 
 export type SummaryResponse = z.infer<typeof summarySchema>;
 
-// Configuration for different summarization models
-const MODEL_CONFIGS = {
-  'facebook/bart-large-cnn': {
-    url: 'https://api-inference.huggingface.co/models/facebook/bart-large-cnn',
-    maxLength: 1024,
-    minLength: 100,
-  },
-  'google/pegasus-xsum': {
-    url: 'https://api-inference.huggingface.co/models/google/pegasus-xsum',
-    maxLength: 512,
-    minLength: 50,
-  },
-  't5-small': {
-    url: 'https://api-inference.huggingface.co/models/t5-small',
-    maxLength: 512,
-    minLength: 100,
-  },
-} as const;
-
-type ModelName = keyof typeof MODEL_CONFIGS;
+type ModelName = 'facebook/bart-large-cnn' | 'google/pegasus-xsum' | 't5-small';
 
 /**
  * Generate a summary using HuggingFace's inference API
@@ -40,46 +22,25 @@ export async function generateSummary(
   text: string,
   modelName: ModelName = 'facebook/bart-large-cnn'
 ): Promise<SummaryResponse> {
-  const config = MODEL_CONFIGS[modelName];
-  
   try {
-    const response = await fetch(config.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // No API key needed for free inference endpoints
-      },
-      body: JSON.stringify({
-        inputs: text,
-        parameters: {
-          max_length: config.maxLength,
-          min_length: config.minLength,
-          do_sample: false,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-
-    const result = await response.json();
+    // First, generate the main summary
+    const summary = await generateTextSummary(text, modelName);
     
-    // Extract the summary text from the response
-    const summary = Array.isArray(result) 
-      ? result[0]?.summary_text || result[0]?.generated_text || ''
-      : result.summary_text || result.generated_text || '';
-
-    // Generate action items using a simpler model
-    const actionItems = await extractActionItems(text);
+    // Then extract action items in parallel with follow-up text generation
+    const [actionItems, followUpText] = await Promise.all([
+      extractActionItems(text),
+      generateFollowUpText(summary, []), // Generate basic follow-up text first
+    ]);
     
-    // Generate follow-up text
-    const followUpText = generateFollowUpText(summary, actionItems);
+    // Update follow-up text with action items
+    const enhancedFollowUpText = actionItems.length > 0
+      ? updateFollowUpWithActionItems(followUpText, actionItems)
+      : followUpText;
 
     return {
       summary: summary.trim(),
       actionItems,
-      followUpText,
+      followUpText: enhancedFollowUpText,
     };
   } catch (error) {
     console.error('Error generating summary:', error);
@@ -88,43 +49,92 @@ export async function generateSummary(
 }
 
 /**
+ * Generate a text summary using the specified model
+ */
+async function generateTextSummary(text: string, modelName: ModelName): Promise<string> {
+  const config = getModelConfig(modelName);
+  
+  try {
+    const response = await callHuggingFace(
+      modelName,
+      text,
+      {
+        max_length: config.maxLength,
+        min_length: config.minLength,
+        do_sample: false,
+      },
+      {
+        maxRetries: 3,
+        retryDelay: 1000,
+        timeout: 30000, // 30 seconds
+      }
+    );
+    
+    return parseHuggingFaceResponse(response);
+  } catch (error) {
+    console.error(`Error with model ${modelName}:`, error);
+    
+    // Try fallback models if the primary model fails
+    if (modelName !== 'facebook/bart-large-cnn') {
+      return generateTextSummary(text, 'facebook/bart-large-cnn');
+    }
+    
+    throw error; // Re-throw if all fallbacks fail
+  }
+}
+
+/**
  * Extract action items from the text using a simpler model
  */
 async function extractActionItems(text: string): Promise<string[]> {
   try {
-    // Use a smaller model for action item extraction
-    const response = await fetch(
-      'https://api-inference.huggingface.co/models/facebook/bart-large-mnli',
+    // First, try to extract using a more sophisticated approach
+    const actionItems = await extractActionItemsWithModel(text);
+    if (actionItems.length > 0) {
+      return actionItems;
+    }
+    
+    // Fall back to regex if model extraction fails
+    return extractActionItemsFallback(text);
+  } catch (error) {
+    console.error('Error extracting action items:', error);
+    return extractActionItemsFallback(text);
+  }
+}
+
+/**
+ * Extract action items using a model
+ */
+async function extractActionItemsWithModel(text: string): Promise<string[]> {
+  try {
+    const response = await callHuggingFace(
+      'facebook/bart-large-mnli',
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inputs: text,
-          parameters: {
-            candidate_labels: [
-              'action item',
-              'task',
-              'todo',
-              'follow up',
-              'next steps',
-              'decision',
-            ],
-          },
-        }),
+        inputs: text,
+        parameters: {
+          candidate_labels: [
+            'action item',
+            'task',
+            'todo',
+            'follow up',
+            'next steps',
+            'decision',
+          ],
+        },
+      },
+      {},
+      {
+        maxRetries: 2,
+        retryDelay: 1000,
+        timeout: 20000, // 20 seconds
       }
     );
 
-    if (!response.ok) {
-      throw new Error('Failed to extract action items');
-    }
-
-    const result = await response.json();
-    
-    // Extract the most relevant sentences that are likely action items
+    // Extract sentences that are likely action items
     const sentences = text
       .split(/(?<=\.)\s+/)
-      .filter(s => s.length > 20); // Filter out very short sentences
-      
+      .filter(s => s.length > 20 && !s.startsWith('http')); // Filter out very short sentences and URLs
+
     // Take top 3 most relevant sentences as action items
     return sentences.slice(0, 3).map(s => s.trim());
   } catch (error) {
@@ -161,7 +171,31 @@ function generateFollowUpText(summary: string, actionItems: string[]): string {
     ? `\n\nAction Items:\n- ${actionItems.join('\n- ')}`
     : '';
 
-  return `Hi team,\n\nHere's a summary of our discussion:${summary}${actionItemsText}\n\nPlease let me know if you have any questions or need further clarification.\n\nBest regards,\n[Your Name]`;
+  return `Hi team,\n\nHere's a summary of our discussion:\n\n${summary}${actionItemsText}\n\nPlease let me know if you have any questions or need further clarification.\n\nBest regards,\n[Your Name]`;
+}
+
+/**
+ * Update follow-up text with action items
+ */
+function updateFollowUpWithActionItems(followUpText: string, actionItems: string[]): string {
+  if (actionItems.length === 0) return followUpText;
+  
+  const actionItemsSection = `\n\nAction Items:\n- ${actionItems.join('\n- ')}`;
+  
+  // Check if action items are already in the follow-up text
+  if (followUpText.includes('Action Items:')) {
+    // Replace existing action items
+    return followUpText.replace(
+      /Action Items:[\s\S]*?(?=\n\n|$)/,
+      `Action Items:${actionItemsSection.substring(13)}` // Remove 'Action Items:' from the section
+    );
+  }
+  
+  // Add action items before the closing
+  return followUpText.replace(
+    /\n\nBest regards,/,
+    `${actionItemsSection}\n\nBest regards,`
+  );
 }
 
 /**
