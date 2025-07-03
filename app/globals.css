@@ -9,7 +9,7 @@
   --secondary-hue: 320;
   --accent-hue: 180;
   
-  /* Neon Palette */
+  /* Neon Palette - A11Y Check: Ensure sufficient contrast for these colors. */
   --neon-blue: #00d4ff;
   --neon-purple: #8b5cf6;
   --neon-pink: #f472b6;
@@ -37,6 +37,7 @@
   /* Typography Scale */
   --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --color-text-muted: rgb(107, 114, 128);
   
   /* Animation Curves */
   --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -55,14 +56,12 @@
     --glass-bg: rgba(0, 0, 0, 0.2);
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    --color-text-muted: rgb(156, 163, 175);
   }
 }
 
 /* ===== BASE STYLES ===== */
-* {
-  box-sizing: border-box;
-}
-
+*,
 *::before,
 *::after {
   box-sizing: border-box;
@@ -78,7 +77,6 @@ body {
   line-height: 1.6;
   color: rgb(15, 23, 42);
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  overflow-x: hidden;
   transition: all 0.3s ease;
 }
 
@@ -99,10 +97,11 @@ body {
     transform-style: preserve-3d;
     perspective: 1000px;
     overflow: hidden;
+    will-change: transform, box-shadow;
     
     /* Base state */
     background: var(--glass-bg);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     
@@ -172,7 +171,7 @@ body {
   /* SECONDARY BUTTON - Glassmorphism Pro */
   .btn-secondary {
     background: var(--glass-bg);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
     border: 2px solid var(--glass-border);
     color: rgb(51, 65, 85);
     
@@ -184,6 +183,16 @@ body {
     }
   }
   
+  @media (prefers-color-scheme: dark) {
+    .btn-secondary {
+      color: rgb(229, 231, 235);
+      &:hover {
+        background: rgba(0, 212, 255, 0.1);
+        color: white;
+      }
+    }
+  }
+
   /* NEON BUTTON - Cyberpunk Vibes */
   .btn-neon {
     background: transparent;
@@ -204,10 +213,7 @@ body {
     &:hover {
       color: white;
       text-shadow: 0 0 10px white;
-      box-shadow: 
-        0 0 20px var(--neon-purple),
-        0 0 40px var(--neon-purple),
-        0 0 80px var(--neon-purple);
+      box-shadow: var(--shadow-neon);
     }
     
     &:hover::before {
@@ -221,12 +227,14 @@ body {
     border: none;
     color: white;
     border-radius: 50px;
-    animation: float 3s ease-in-out infinite;
-    
-    &:hover {
-      animation-play-state: paused;
-      transform: translateY(-8px) scale(1.1);
-      box-shadow: var(--shadow-floating);
+  }
+  
+  @media (prefers-reduced-motion: no-preference) {
+    .btn-floating {
+      animation: float 3s ease-in-out infinite;
+      &:hover {
+        animation-play-state: paused;
+      }
     }
   }
   
@@ -255,10 +263,11 @@ body {
   .input {
     @apply relative w-full px-4 py-3 text-sm transition-all duration-300;
     background: var(--glass-bg);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
     border: 2px solid transparent;
     border-radius: 12px;
     outline: none;
+    will-change: transform, box-shadow;
     
     /* Gradient border effect */
     background-clip: padding-box;
@@ -271,16 +280,15 @@ body {
       background: var(--gradient-cosmic);
       border-radius: inherit;
       mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
       mask-composite: xor;
       opacity: 0;
       transition: opacity 0.3s ease;
     }
     
     &:focus {
-      border-color: var(--neon-blue);
-      box-shadow: 
-        0 0 0 3px rgba(0, 212, 255, 0.1),
-        0 0 20px rgba(0, 212, 255, 0.2);
+      color: var(--neon-blue);
+      box-shadow: var(--shadow-neon);
       transform: scale(1.02);
     }
     
@@ -288,10 +296,10 @@ body {
       opacity: 1;
     }
     
-    /* Floating label effect */
+    /* Floating label effect - Note: relies on direct sibling selector, can be brittle. */
     &:not(:placeholder-shown) + .input-label,
     &:focus + .input-label {
-      transform: translateY(-25px) scale(0.8);
+      transform: translateY(-1.6em) scale(0.8);
       color: var(--neon-blue);
     }
   }
@@ -300,7 +308,7 @@ body {
     position: absolute;
     left: 16px;
     top: 12px;
-    color: rgb(107, 114, 128);
+    color: var(--color-text-muted);
     pointer-events: none;
     transition: all 0.3s var(--ease-bounce);
     transform-origin: left top;
@@ -314,23 +322,26 @@ body {
   /* ===== REVOLUTIONARY CARD SYSTEM ===== */
   .card {
     background: var(--glass-bg);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
     border: 1px solid var(--glass-border);
     border-radius: 24px;
     padding: 32px;
     position: relative;
     overflow: hidden;
     transition: all 0.4s var(--ease-elastic);
+    will-change: transform, box-shadow;
     
+    /* Shimmer effect */
     &::before {
       content: '';
       position: absolute;
       top: 0;
-      left: -100%;
-      width: 100%;
+      left: -150%;
+      width: 50%;
       height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.5s ease;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transform: skewX(-25deg);
+      transition: left 0.75s ease-in-out;
     }
     
     &:hover {
@@ -339,7 +350,7 @@ body {
     }
     
     &:hover::before {
-      left: 100%;
+      left: 150%;
     }
   }
   
@@ -358,108 +369,62 @@ body {
   /* FLOATING CARD - Levitation Effect */
   .card-floating {
     @apply card;
-    animation: float 4s ease-in-out infinite;
-    
-    &:hover {
-      animation-play-state: paused;
-    }
   }
   
+  @media (prefers-reduced-motion: no-preference) {
+    .card-floating {
+      animation: float 4s ease-in-out infinite;
+      &:hover {
+        animation-play-state: paused;
+      }
+    }
+  }
+
   /* HOLOGRAPHIC CARD - Future Tech */
   .card-holographic {
     @apply card;
-    background: linear-gradient(45deg, 
-      rgba(255, 0, 255, 0.1) 0%,
-      rgba(0, 255, 255, 0.1) 25%,
-      rgba(255, 255, 0, 0.1) 50%,
-      rgba(255, 0, 255, 0.1) 75%,
-      rgba(0, 255, 255, 0.1) 100%);
     background-size: 200% 200%;
-    animation: holographic 3s ease-in-out infinite;
     
     &:hover {
       animation-duration: 1s;
     }
   }
-  
-  /* ===== ADVANCED UTILITY CLASSES ===== */
-  
-  /* Text Effects */
-  .text-glow {
-    text-shadow: 0 0 10px currentColor;
-  }
-  
-  .text-neon {
-    color: var(--neon-blue);
-    text-shadow: 
-      0 0 5px var(--neon-blue),
-      0 0 10px var(--neon-blue),
-      0 0 20px var(--neon-blue);
-  }
-  
-  .text-gradient {
-    background: var(--gradient-cosmic);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  
-  /* Morphism Effects */
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-  }
-  
-  .neumorphism {
-    background: #e0e5ec;
-    box-shadow: 
-      20px 20px 60px #bebebe,
-      -20px -20px 60px #ffffff;
-  }
-  
-  /* Interactive Effects */
-  .hover-tilt {
-    transition: transform 0.3s ease;
-  }
-  
-  .hover-tilt:hover {
-    transform: perspective(1000px) rotateX(10deg) rotateY(10deg);
-  }
-  
-  .magnetic {
-    transition: transform 0.1s ease;
-  }
-  
-  /* Scroll Reveal Effects */
-  .reveal {
-    opacity: 0;
-    transform: translateY(50px);
-    transition: all 0.6s var(--ease-bounce);
-  }
-  
-  .reveal.active {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  
-  /* Loading Effects */
-  .loading {
-    position: relative;
-    color: transparent;
-  }
-  
-  .loading::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--gradient-cosmic);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: inherit;
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card-holographic {
+       background: linear-gradient(45deg, 
+        rgba(255, 0, 255, 0.1) 0%,
+        rgba(0, 255, 255, 0.1) 25%,
+        rgba(255, 255, 0, 0.1) 50%,
+        rgba(255, 0, 255, 0.1) 75%,
+        rgba(0, 255, 255, 0.1) 100%);
+      animation: holographic 3s ease-in-out infinite;
+    }
   }
 }
+
+/* ===== GLOBAL ANIMATIONS ===== */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes holographic {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 
 /* ===== ADVANCED ANIMATIONS ===== */
 @keyframes float {
