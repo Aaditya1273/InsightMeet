@@ -26,7 +26,7 @@ type MeetingSummary = {
 
 export default function ResultsPage() {
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get('sessionId');
+  const fileKey = searchParams.get('fileKey');
   const [summary, setSummary] = useState<MeetingSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +35,8 @@ export default function ResultsPage() {
 
   useEffect(() => {
     const fetchSummary = async () => {
-      if (!sessionId) {
-        setError('No session ID provided');
+      if (!fileKey) {
+        setError('No file key provided');
         setIsLoading(false);
         return;
       }
@@ -50,7 +50,7 @@ export default function ResultsPage() {
         await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
         
         const mockData: MeetingSummary = {
-          id: sessionId,
+          id: fileKey,
           title: 'Team Sync Meeting',
           date: new Date().toLocaleDateString(),
           duration: '1 hour',
@@ -89,7 +89,7 @@ export default function ResultsPage() {
     };
 
     fetchSummary();
-  }, [sessionId]);
+  }, [fileKey]);
 
   const handleExportPDF = () => {
     // This would be implemented using a PDF generation library
