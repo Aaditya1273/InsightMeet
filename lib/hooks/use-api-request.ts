@@ -75,7 +75,6 @@ type RequestState<T> = {
   retryCount: number;
   lastRequestTime: number;
 }
-};
 
 // Global cache and deduplication storage
 const globalCache = new Map<string, CacheEntry<any>>();
@@ -239,17 +238,16 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
       // Apply optimistic updates
       if (optimistic && optimisticData) {
-        const nextState: RequestState<T> = {
-          ...state,
-          data: optimisticData as T,
+        setState((prevState: RequestState<T>) => ({
+          ...prevState,
+          data: optimisticData,
           isLoading: true,
           error: null,
           requestId: requestId,
           progress: null,
           retryCount: 0,
           lastRequestTime: Date.now()
-        };
-        setState(nextState);
+        } as RequestState<T>));
       }
 
       // Build URL with query parameters

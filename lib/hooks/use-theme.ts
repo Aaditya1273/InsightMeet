@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { createContext, useContext, ReactNode } from 'react';
 
@@ -236,27 +237,27 @@ export function useTheme(userConfig: ThemeConfig = {}): ThemeState {
 
 // Theme Provider Context (optional advanced usage)
 export interface ThemeProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
   config?: ThemeConfig;
 }
 
-export function ThemeProvider({ children, config }: ThemeProviderProps) {
+export function ThemeProvider({ children, config }: ThemeProviderProps): React.ReactElement {
   const theme = useTheme(config);
   
-  return (
-    <ThemeContext.Provider value={theme}>
-      {children}
-    </ThemeContext.Provider>
+  return React.createElement(
+    ThemeContext.Provider,
+    { value: theme },
+    children
   );
 }
 
-export function useThemeContext(): ThemeState {
+export const useThemeContext = (): ThemeState => {
   const context = useContext(ThemeContext);
   if (!context) {
     throw new Error('useThemeContext must be used within a ThemeProvider');
   }
   return context;
-}
+};
 
 // Additional utility hooks
 export function useMediaQuery(query: string): boolean {

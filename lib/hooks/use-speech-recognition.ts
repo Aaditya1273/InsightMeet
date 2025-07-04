@@ -157,6 +157,7 @@ interface SpeechRecognition extends EventTarget {
   onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
   onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
   onnomatch: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -168,6 +169,9 @@ declare global {
     webkitSpeechRecognition: { new(): SpeechRecognition }
     SpeechGrammarList: { new(): SpeechGrammarList }
     webkitSpeechGrammarList: { new(): SpeechGrammarList }
+    performance: Performance & {
+      readonly timeOrigin: DOMHighResTimeStamp;
+    }
   }
 
   interface Navigator {
