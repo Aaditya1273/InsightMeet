@@ -3,6 +3,16 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
+type RequestStateUpdate<T> = {
+  data?: T;
+  error?: string | null;
+  requestId?: string;
+  progress?: { loaded: number; total: number } | null;
+  retryCount?: number;
+  lastRequestTime?: number;
+  [key: string]: any;
+};
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
 type CacheStrategy = 'no-cache' | 'cache-first' | 'network-first' | 'stale-while-revalidate';
@@ -74,6 +84,8 @@ type RequestState<T> = {
   progress: { loaded: number; total: number } | null;
   retryCount: number;
   lastRequestTime: number;
+  loaded: number;
+  total: number;
 }
 
 // Global cache and deduplication storage
@@ -97,19 +109,35 @@ const performanceMetrics = {
   errorRate: 0,
 };
 
-export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> = {}) {
+export function useApiRequest<T extends unknown = any>(globalConfig: Partial<RequestOptions<T>> = {}) {
   const [state, setState] = useState<RequestState<T>>({
     isLoading: false,
     error: null,
-    data: null,
+    data: null as T | null,
     status: null,
-    headers: {},
+    headers: {} as Record<string, string>,
     fromCache: false,
     requestId: null,
     progress: null,
     retryCount: 0,
     lastRequestTime: 0,
+    loaded: 0,
+    total: 0
   });
+
+  const updateState = useCallback((update: RequestStateUpdate<T>) => {
+    const nextState = {
+      ...state,
+      ...update,
+      data: update.data ?? state.data,
+      error: update.error ?? state.error,
+      requestId: update.requestId ?? state.requestId,
+      progress: update.progress ?? state.progress,
+      retryCount: update.retryCount ?? state.retryCount,
+      lastRequestTime: update.lastRequestTime ?? Date.now()
+    } as RequestState<T>;
+    setState(nextState);
+  }, [state]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef<string>('');
@@ -238,16 +266,16 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
       // Apply optimistic updates
       if (optimistic && optimisticData) {
-        setState((prevState: RequestState<T>) => ({
+        setState<RequestState<T>>((prevState) => ({
           ...prevState,
-          data: optimisticData,
+          data: optimisticData as T,
           isLoading: true,
           error: null,
           requestId: requestId,
           progress: null,
           retryCount: 0,
           lastRequestTime: Date.now()
-        } as RequestState<T>));
+        }));
       }
 
       // Build URL with query parameters
