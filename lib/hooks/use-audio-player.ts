@@ -1,4 +1,109 @@
-      isMuted: newVolume === 0 ? true : prev.isMuted,
+      import { useState, useEffect, useCallback, useRef } from 'react';
+
+interface AudioPlayerState {
+  isPlaying: boolean;
+  duration: number;
+  currentTime: number;
+  volume: number;
+  isMuted: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface AudioPlayerHook {
+  isPlaying: boolean;
+  duration: number;
+  currentTime: number;
+  volume: number;
+  isMuted: boolean;
+  isLoading: boolean;
+  error: string | null;
+  audioRef: React.RefObject<HTMLAudioElement>;
+  play: () => Promise<boolean>;
+  pause: () => boolean;
+  togglePlayPause: () => Promise<boolean>;
+  seek: (time: number) => void;
+  setVolume: (volume: number) => void;
+  toggleMute: () => void;
+  skipForward: (seconds: number) => void;
+  skipBackward: (seconds: number) => void;
+  formatTime: (time: number) => string;
+  formattedCurrentTime: string;
+  formattedDuration: string;
+}
+
+export function useAudioPlayer(): AudioPlayerHook {
+  const [state, setState] = useState<AudioPlayerState>({
+    isPlaying: false,
+    duration: 0,
+    currentTime: 0,
+    volume: 1,
+    isMuted: false,
+    isLoading: false,
+    error: null,
+  });
+
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Play audio
+  const play = useCallback(async () => {
+    if (!audioRef.current) return false;
+    
+    try {
+      setState(prev => ({ ...prev, isLoading: true }));
+      await audioRef.current.play();
+      setState(prev => ({ ...prev, isPlaying: true, isLoading: false }));
+      return true;
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: audioRef.current ? getAudioError(audioRef.current) : 'Failed to play audio',
+      }));
+      return false;
+    }
+  }, []);
+
+  // Pause audio
+  const pause = useCallback((): boolean => {
+    if (!audioRef.current) return false;
+
+    audioRef.current.pause();
+    setState(prev => ({ ...prev, isPlaying: false }));
+    return true;
+  }, []);
+
+  // Toggle play/pause
+  const togglePlayPause = useCallback(async () => {
+    if (!audioRef.current) return false;
+
+    if (state.isPlaying) {
+      await pause();
+      return false;
+    } else {
+      const played = await play();
+      return played;
+    }
+  }, [state.isPlaying, pause, play]);
+
+  // Seek to a specific time
+  const seek = useCallback((time: number) => {
+    if (!audioRef.current) return;
+
+    audioRef.current.currentTime = time;
+    setState(prev => ({ ...prev, currentTime: time }));
+  }, []);
+
+  // Set volume
+  const setVolume = useCallback((newVolume: number) => {
+    if (!audioRef.current) return;
+
+    const volume = Math.max(0, Math.min(newVolume, 1));
+    audioRef.current.volume = volume;
+    setState(prev => ({
+      ...prev,
+      volume,
+      isMuted: volume === 0 ? true : prev.isMuted,
     }));
   }, []);
 
@@ -7,8 +112,12 @@
     setState(prev => ({
       ...prev,
       isMuted: !prev.isMuted,
+      volume: prev.isMuted ? 1 : 0,
     }));
-  }, []);
+    if (audioRef.current) {
+      audioRef.current.volume = state.isMuted ? 1 : 0;
+    }
+  }, [state.isMuted]);
 
   // Skip forward by a number of seconds
   const skipForward = useCallback((seconds: number) => {
@@ -16,7 +125,7 @@
     
     const newTime = Math.min(
       audioRef.current.currentTime + seconds,
-      state.duration || 0
+      state.duration
     );
     
     audioRef.current.currentTime = newTime;
@@ -116,8 +225,8 @@ export const mockUseAudioPlayer = (): ReturnType<typeof useAudioPlayer> => ({
   error: null,
   audioRef: { current: null },
   play: async () => false,
-  pause: () => {},
-  togglePlayPause: async () => {},
+  pause: () => true,
+  togglePlayPause: async () => false,
   seek: () => {},
   setVolume: () => {},
   toggleMute: () => {},

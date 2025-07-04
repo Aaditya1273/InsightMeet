@@ -14,6 +14,7 @@ export const config = {
     },
     // Default timeout for API requests in milliseconds
     timeout: 30000,
+    token: process.env.NEXT_PUBLIC_API_TOKEN || '',
   },
 
   // File upload configuration
