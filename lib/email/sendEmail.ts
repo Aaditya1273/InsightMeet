@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-interface SendEmailParams {
+export interface SendEmailParams {
   to: string | string[]; // Support multiple recipients
   subject: string;
   text: string;

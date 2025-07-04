@@ -34,7 +34,7 @@ export function useMeetingSummary({ onSuccess, onError }: UseMeetingSummaryOptio
   const [summary, setSummary] = useState<MeetingSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { post, get } = useApi<MeetingSummary>();
+  const { post, get, patch, delete: deleteRequest } = useApi<MeetingSummary>();
 
   // Create a new meeting summary
   const createSummary = useCallback(
@@ -121,17 +121,16 @@ export function useMeetingSummary({ onSuccess, onError }: UseMeetingSummaryOptio
       setError(null);
 
       try {
-        const { data, error } = await post(
+        const { data, error } = await patch(
           `/api/summaries/${id}`,
           { ...updates },
           {
-            method: 'PATCH',
-            onSuccess: (data) => {
+            onSuccess: (data: MeetingSummary) => {
               setSummary(data);
               onSuccess?.(data);
               toast.success('Meeting summary updated successfully');
             },
-            onError: (err) => {
+            onError: (err: Error, attemptNumber?: number) => {
               setError(err.message);
               onError?.(err);
               toast.error('Failed to update meeting summary');
@@ -162,24 +161,23 @@ export function useMeetingSummary({ onSuccess, onError }: UseMeetingSummaryOptio
       setError(null);
 
       try {
-        const { error } = await post(
+        const response = await deleteRequest(
           `/api/summaries/${id}`,
-          {},
           {
-            method: 'DELETE',
-            onSuccess: () => {
+            onSuccess: (data: MeetingSummary) => {
               setSummary(null);
               toast.success('Meeting summary deleted successfully');
             },
-            onError: (err) => {
+            onError: (err: Error, attemptNumber?: number) => {
               setError(err.message);
               onError?.(err);
               toast.error('Failed to delete meeting summary');
+              return false;
             },
           }
         );
 
-        return !error;
+        return true;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to delete meeting summary';
         setError(errorMessage);

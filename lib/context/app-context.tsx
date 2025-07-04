@@ -27,7 +27,8 @@ type AppContextType = {
   // Theme
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
-  isDarkMode: boolean;
+  isDark: boolean;
+  isMounted: boolean;
   toggleTheme: () => void;
   
   // Auth
@@ -54,7 +55,8 @@ type AppProviderProps = {
 
 export function AppProvider({ children, initialUser = null }: AppProviderProps) {
   const router = useRouter();
-  const { theme, setTheme, isDarkMode } = useTheme();
+  const { theme, setTheme: setThemeState, isMounted } = useTheme();
+  const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [auth, setAuth] = useState<AuthState>({
     user: initialUser,
@@ -254,7 +256,7 @@ export function AppProvider({ children, initialUser = null }: AppProviderProps) 
 
   // Toggle theme
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    setThemeState(theme === 'dark' ? 'light' : 'dark');
   };
 
   // Toggle sidebar
@@ -282,23 +284,18 @@ export function AppProvider({ children, initialUser = null }: AppProviderProps) 
   // Context value
   const value = {
     // Theme
-    theme: theme as 'light' | 'dark' | 'system',
-    setTheme,
-    isDarkMode,
+    theme,
+    setTheme: setThemeState,
+    isDark: isDarkMode,
+    isMounted,
     toggleTheme,
-    
-    // Auth
     auth,
     login,
     register,
     logout,
     updateProfile,
-    
-    // UI State
     isSidebarOpen,
     toggleSidebar,
-    
-    // Toast
     showToast,
   };
 

@@ -74,6 +74,7 @@ type RequestState<T> = {
   progress: { loaded: number; total: number } | null;
   retryCount: number;
   lastRequestTime: number;
+}
 };
 
 // Global cache and deduplication storage
@@ -206,7 +207,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
   // Main request function with all advanced features
   const request = useCallback(
-    async (url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
+    async <T>(url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
       const startTime = Date.now();
       const requestId = generateRequestId();
       requestIdRef.current = requestId;
@@ -238,13 +239,17 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
       // Apply optimistic updates
       if (optimistic && optimisticData) {
-        setState(prev => ({ 
-          ...prev, 
-          data: optimisticData,
+        const nextState: RequestState<T> = {
+          ...state,
+          data: optimisticData as T,
           isLoading: true,
           error: null,
-          requestId 
-        }));
+          requestId: requestId,
+          progress: null,
+          retryCount: 0,
+          lastRequestTime: Date.now()
+        };
+        setState(nextState);
       }
 
       // Build URL with query parameters
@@ -279,17 +284,22 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
             timestamp: cachedData.timestamp,
           };
 
-          setState(prev => ({
-            ...prev,
-            data: cachedData.data,
-            status: cachedData.status,
-            headers: cachedData.headers,
-            fromCache: true,
-            requestId,
-            isLoading: false,
-            error: null,
-            lastRequestTime: Date.now(),
-          }));
+          setState((prev: RequestState<T>) => {
+            const newState: RequestState<T> = {
+              ...prev,
+              data: cachedData.data,
+              status: cachedData.status,
+              headers: cachedData.headers,
+              fromCache: true,
+              requestId,
+              isLoading: false,
+              error: null,
+              lastRequestTime: Date.now(),
+              progress: null,
+              retryCount: 0
+            };
+            return newState;
+          });
 
           onSuccess?.(cachedData.data, new Response());
 
@@ -348,7 +358,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
         requestConfig = interceptor(requestConfig);
       }
 
-      const executeRequest = async (): Promise<ApiResponse<T>> => {
+      const executeRequest = async <T>(): Promise<ApiResponse<T>> => {
         const timeoutId = setTimeout(() => {
           abortControllerRef.current?.abort();
         }, timeout);
@@ -410,12 +420,15 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
           setState(prev => ({ 
             ...prev, 
-            data: finalData,
+            data: finalData as T,
             status: response.status,
             headers: responseHeaders,
             isLoading: false,
             error: null,
             fromCache: false,
+            lastRequestTime: Date.now(),
+            progress: { loaded: 100, total: 100 },
+            retryCount: 0,
           }));
 
           onSuccess?.(finalData, response);
@@ -488,24 +501,24 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
         pendingRequests.set(dedupeKey, requestPromise);
       }
 
-      return requestPromise;
-    },
-    [globalConfig, generateRequestId, getCacheKey, getCachedData, setCachedData, executeWithRetry]
-  );
-
-  // Enhanced HTTP method helpers
   const get = useCallback(
-    (url: string, options: Omit<RequestOptions<T>, 'method'> = {}) =>
-      request(url, { ...options, method: 'GET' }),
+    <T = any>(
+      url: string,
+      options: Omit<RequestOptions<T>, 'method'> = {}
+    ): Promise<ApiResponse<typeof responseData>> => {
+      return request<T>(url, { ...options, method: 'GET' });
+    },
     [request]
   );
 
   const post = useCallback(
-    <TData = any>(
+    <T = any>(
       url: string,
       body?: any,
-      options: Omit<RequestOptions<TData>, 'method' | 'body'> = {}
-    ) => request<TData>(url, { ...options, method: 'POST', body }),
+      options: Omit<RequestOptions<T>, 'method' | 'body'> = {}
+    ): Promise<ApiResponse<typeof responseData>> => {
+      return request<T>(url, { ...options, method: 'POST', body });
+    },
     [request]
   );
 
@@ -514,28 +527,34 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
       url: string,
       body?: any,
       options: Omit<RequestOptions<T>, 'method' | 'body'> = {}
-    ) => request<T>(url, { ...options, method: 'PUT', body }),
+    ): Promise<ApiResponse<typeof responseData>> => {
+      return request<T>(url, { ...options, method: 'PUT', body });
+    },
     [request]
   );
 
   const patch = useCallback(
-    <TData = any>(
+    <T = any>(
       url: string,
       body?: any,
-      options: Omit<RequestOptions<TData>, 'method' | 'body'> = {}
-    ) => request<TData>(url, { ...options, method: 'PATCH', body }),
+      options: Omit<RequestOptions<T>, 'method' | 'body'> = {}
+    ): Promise<ApiResponse<typeof responseData>> => {
+      return request<T>(url, { ...options, method: 'PATCH', body });
+    },
     [request]
   );
 
-  const del = useCallback(
-    <TData = any>(
+  const deleteRequest = useCallback(
+    <T = any>(
       url: string,
-      options: Omit<RequestOptions<TData>, 'method'> = {}
-    ) => request<TData>(url, { ...options, method: 'DELETE' }),
+      options: Omit<RequestOptions<T>, 'method'> = {}
+    ): Promise<ApiResponse<typeof responseData>> => {
+      return request<T>(url, { ...options, method: 'DELETE' });
+    },
     [request]
   );
 
-  // Advanced utility methods
+  // Request management methods
   const cancelRequest = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -564,15 +583,21 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
     });
   }, [cancelRequest]);
 
-  const revalidate = useCallback(async (url: string, options: RequestOptions<T> = {}) => {
-    const cacheKey = getCacheKey(url, options);
-    globalCache.delete(cacheKey);
-    return request(url, { ...options, cacheStrategy: 'network-first' });
-  }, [getCacheKey, request]);
+  const revalidate = useCallback(
+    <T = any>(url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
+      const cacheKey = getCacheKey(url, options);
+      globalCache.delete(cacheKey);
+      return request(url, { ...options, cacheStrategy: 'network-first' });
+    },
+    [getCacheKey, request]
+  );
 
-  const prefetch = useCallback(async (url: string, options: RequestOptions<T> = {}) => {
-    return request(url, { ...options, skipToast: true });
-  }, [request]);
+  const prefetch = useCallback(
+    <T = any>(url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
+      return request(url, { ...options, skipToast: true });
+    },
+    [request]
+  );
 
   // Cleanup effect
   useEffect(() => {
@@ -599,7 +624,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
     post,
     put,
     patch,
-    delete: del,
+    delete: deleteRequest,
     
     // Advanced methods
     cancelRequest,

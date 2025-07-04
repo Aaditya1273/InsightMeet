@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { isClient } from '@/lib/utils';
+
 
 type SetValue<T> = T | ((prevValue: T) => T);
 type Options = {
@@ -21,7 +21,7 @@ export function useLocalStorage<T>(
 ): [T, (value: SetValue<T>) => void, () => void] {
   const { serialize, deserialize } = { ...defaultOptions, ...options };
   const [storedValue, setStoredValue] = useState<T>(() => {
-    if (!isClient) {
+    if (typeof window === 'undefined') {
       return initialValue;
     }
 
@@ -39,7 +39,7 @@ export function useLocalStorage<T>(
 
   // Update local storage when the key or value changes
   useEffect(() => {
-    if (!isClient) return;
+    if (typeof window === 'undefined') return;
 
     // If the key has changed, update the stored value from the new key
     if (prevKeyRef.current !== key) {
@@ -63,7 +63,7 @@ export function useLocalStorage<T>(
 
   // Handle storage events from other tabs/windows
   useEffect(() => {
-    if (!isClient) return;
+    if (typeof window === 'undefined') return;
 
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key !== key) return;

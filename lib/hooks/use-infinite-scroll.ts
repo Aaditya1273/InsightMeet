@@ -126,10 +126,22 @@ export function useInfiniteScroll<T>(
   // Initial load
   useEffect(() => {
     if (initialLoad && isInitialMount.current && enabled) {
-      throttledFetchMore();
+      setIsLoading(true);
+      fetchMore(page).then((newItems) => {
+        if (newItems === undefined || newItems.length === 0) {
+          setHasMore(false);
+        } else {
+          setPage((prev) => prev + 1);
+        }
+      }).catch((err) => {
+        console.error('Error in infinite scroll:', err);
+        setError(err instanceof Error ? err : new Error('Failed to load more items'));
+      }).finally(() => {
+        setIsLoading(false);
+      });
       isInitialMount.current = false;
     }
-  }, [enabled, initialLoad, throttledFetchMore]);
+  }, [enabled, initialLoad, page]);
 
   // Clean up observer on unmount
   useEffect(() => {
@@ -158,56 +170,16 @@ export function useInfiniteScroll<T>(
   };
 }
 
-// Helper hook to throttle function calls
-function useThrottle<T extends (...args: any[]) => any>(
-  callback: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  const lastExecuted = useRef<number>(0);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  return useCallback(
-    (...args: Parameters<T>) => {
-      const now = Date.now();
-      const timeSinceLastExecution = now - lastExecuted.current;
-
-      const execute = () => {
-        lastExecuted.current = now;
-        callback(...args);
-      };
-
-      if (timeSinceLastExecution >= delay) {
-        execute();
-      } else {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-
-        timeoutRef.current = setTimeout(() => {
-          execute();
-        }, delay - timeSinceLastExecution);
-      }
-    },
-    [callback, delay]
-  );
-}
-
 // Export a mock version for testing or SSR
-export const mockUseInfiniteScroll = (): UseInfiniteScrollResult => ({
-  loadMoreRef: () => {},
-  isLoading: false,
-  hasMore: false,
-  error: null,
-  reset: () => {},
-});
+export function mockUseInfiniteScroll(): UseInfiniteScrollResult {
+  return {
+    loadMoreRef: () => {},
+    isLoading: false,
+    hasMore: false,
+    error: null,
+    reset: () => {},
+  };
+}
 
 // Export the appropriate version based on the environment
 export default typeof window !== 'undefined' ? useInfiniteScroll : mockUseInfiniteScroll;
