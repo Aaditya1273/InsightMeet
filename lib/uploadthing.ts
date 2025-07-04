@@ -1,9 +1,9 @@
-import { createRouteHandler } from "uploadthing/next";
-import { createUploadthing, type FileRouter } from "uploadthing/next";
+import { createUploadthing, type FileRouter } from 'uploadthing/next';
+import { UploadButton } from '@uploadthing/react';
 
 const f = createUploadthing();
 
-const uploadthingHandler = {
+export const ourFileRouter = {
   meetingUploader: f({
     // Define file types and their limits
     audio: { maxFileSize: "128MB", maxFileCount: 1 },
@@ -22,6 +22,5 @@ const uploadthingHandler = {
   }),
 } satisfies FileRouter;
 
-export const { GET, POST } = createRouteHandler({
-  router: uploadthingHandler,
-});
+export type OurFileRouter = typeof ourFileRouter;
+export { UploadButton };

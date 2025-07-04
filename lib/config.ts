@@ -7,7 +7,7 @@ export const config = {
   api: {
     baseUrl: process.env.NEXT_PUBLIC_API_URL || '/api',
     endpoints: {
-      upload: '/upload',
+      upload: '/uploadthing',
       summary: '/summary',
       email: '/email',
       calendar: '/calendar',
@@ -22,15 +22,15 @@ export const config = {
     maxFileSize: 50 * 1024 * 1024,
     // Allowed file types
     allowedFileTypes: [
-      'audio/mp3',
-      'audio/wav',
-      'audio/m4a',
-      'audio/mpeg',
-      'text/plain',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ],
+      'audio/mp3' as const,
+      'audio/wav' as const,
+      'audio/m4a' as const,
+      'audio/mpeg' as const,
+      'text/plain' as const,
+      'application/pdf' as const,
+      'application/msword' as const,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document' as const,
+    ] as const,
     // File type extensions for display
     fileExtensions: ['.mp3', '.wav', '.m4a', '.txt', '.pdf', '.doc', '.docx'],
   },
@@ -131,7 +131,8 @@ export function isValidFile(file: File): { valid: boolean; error?: string } {
   const fileExtension = `.${file.name.split('.').pop()?.toLowerCase()}`;
   const mimeType = getMimeType(fileExtension);
   
-  if (!mimeType || !config.upload.allowedFileTypes.includes(mimeType)) {
+  // Ensure mimeType is one of the allowed types
+  if (!mimeType || !config.upload.allowedFileTypes.some(allowedType => allowedType === mimeType)) {
     return {
       valid: false,
       error: `Invalid file type. Allowed types: ${config.upload.fileExtensions.join(', ')}`,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { SummaryView } from '@/components/SummaryView';
 import { Button } from '@/components/ui/button';
 import { Download, Mail, Calendar as CalendarIcon } from 'lucide-react';
@@ -25,12 +25,16 @@ type AnalysisResult = {
 };
 
 export default function ResultsPage() {
+  const router = useRouter();
   const { fileKey } = useParams();
   const [summaryData, setSummaryData] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -68,6 +72,27 @@ export default function ResultsPage() {
       setLoading(false);
     }
   }, [fileKey]);
+
+  useEffect(() => {
+    if (summaryData && showEmailForm) {
+      setEmailTo(summaryData.participants?.join(', ') || '');
+      setEmailSubject(summaryData.title ? `Meeting Summary: ${summaryData.title}` : 'Meeting Summary');
+      setEmailBody(`Hello,
+
+Here's the summary of our meeting:
+
+${summaryData.summary}
+
+Key Points:
+${summaryData.keyPoints.map(point => `• ${point}`).join('\n')}
+
+Action Items:
+${summaryData.actionItems.map(item => `- ${item.task} (${item.assignee} - Due: ${item.dueDate})`).join('\n')}
+
+Best regards,
+[Your Name]`);
+    }
+  }, [summaryData, showEmailForm]);
 
   const handleExportPDF = () => {
     // This would be implemented using a PDF generation library
@@ -117,8 +142,9 @@ export default function ResultsPage() {
         body: JSON.stringify({
           title: summaryData.title,
           description: summaryData.summary,
-          startTime: new Date().toISOString(),
-          duration: 1, // Default to 1 hour
+          // Use the actual meeting date. Assumes summaryData.date is a valid date string.
+          startTime: new Date(summaryData.date).toISOString(),
+          duration: 1, // TODO: Parse duration from summaryData.duration string.
           attendees: summaryData.participants,
         }),
       });
@@ -162,7 +188,7 @@ export default function ResultsPage() {
           <Button 
             variant="outline" 
             className="mt-4"
-            onClick={() => window.location.href = '/'}
+            onClick={() => router.push('/')}
           >
             Back to Home
           </Button>
@@ -177,7 +203,7 @@ export default function ResultsPage() {
         <div className="bg-muted/50 border rounded-md p-6 text-center">
           <h2 className="text-xl font-semibold mb-2">No meeting summaryData found</h2>
           <p className="text-muted-foreground mb-4">We couldn't find a meeting summaryData for this session.</p>
-          <Button onClick={() => window.location.href = '/'}>
+          <Button onClick={() => router.push('/')}>
             Start a New Meeting
           </Button>
         </div>
@@ -230,8 +256,9 @@ export default function ResultsPage() {
                 <input
                   type="email"
                   placeholder="recipient@example.com"
-                  className="w-full px-3 py-2 border rounded-md"
-                  defaultValue={summaryData?.participants?.join(', ') || ''}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
                 />
               </div>
               <div>
@@ -241,8 +268,9 @@ export default function ResultsPage() {
                 <input
                   type="text"
                   placeholder="Meeting Summary"
-                  className="w-full px-3 py-2 border rounded-md"
-                  defaultValue={summaryData?.title ? `Meeting Summary: ${summaryData.title}` : 'Meeting Summary'}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
                 />
               </div>
               <div>
@@ -251,21 +279,9 @@ export default function ResultsPage() {
                 </label>
                 <textarea
                   rows={6}
-                  className="w-full px-3 py-2 border rounded-md"
-                  defaultValue={`Hello,
-
-Here's the summary of our meeting:
-
-${summaryData.summary}
-
-Key Points:
-${summaryData.keyPoints.map(point => `• ${point}`).join('\n')}
-
-Action Items:
-${summaryData.actionItems.map(item => `- ${item.task} (${item.assignee} - Due: ${item.dueDate})`).join('\n')}
-
-Best regards,
-[Your Name]`}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
                 />
               </div>
               <div className="flex justify-end space-x-2 pt-2">
@@ -278,11 +294,8 @@ Best regards,
                 </Button>
                 <Button
                   onClick={() => {
-                    const email = (document.querySelector('input[type="email"]') as HTMLInputElement)?.value;
-                    const subject = (document.querySelector('input[type="text"]') as HTMLInputElement)?.value;
-                    const content = (document.querySelector('textarea') as HTMLTextAreaElement)?.value;
-                    if (email && subject && content) {
-                      handleSendEmail(email, subject, content);
+                    if (emailTo && emailSubject && emailBody) {
+                      handleSendEmail(emailTo, emailSubject, emailBody);
                     }
                   }}
                   disabled={isSendingEmail}
