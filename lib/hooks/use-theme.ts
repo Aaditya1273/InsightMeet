@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { createContext, useContext, ReactNode } from 'react';
 
 // Enhanced theme types with comprehensive options
 export type Theme = 'light' | 'dark' | 'system';
@@ -28,6 +29,9 @@ export interface ThemeState {
   isMounted: boolean;
   config: Required<ThemeConfig>;
 }
+
+// Create context with null as initial value
+export const ThemeContext = createContext<ThemeState | null>(null);
 
 // Default configuration
 const DEFAULT_CONFIG: Required<ThemeConfig> = {
@@ -231,11 +235,6 @@ export function useTheme(userConfig: ThemeConfig = {}): ThemeState {
 }
 
 // Theme Provider Context (optional advanced usage)
-import { createContext, useContext, ReactNode } from 'react';
-
-// Create context with null as initial value
-export const ThemeContext = createContext<ThemeState | null>(null);
-
 export interface ThemeProviderProps {
   children: ReactNode;
   config?: ThemeConfig;
