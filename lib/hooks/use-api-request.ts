@@ -288,13 +288,18 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
       if (optimistic && optimisticData) {
         safeSetState(prev => ({
           ...prev,
-          data: optimisticData,
+          data: optimisticData as T,
           isLoading: true,
           error: null,
-          requestId,
+          requestId: requestId,
           progress: null,
           retryCount: 0,
           lastRequestTime: Date.now(),
+          status: null,
+          headers: {},
+          fromCache: false,
+          loaded: 0,
+          total: 0,
         }));
       }
 
@@ -321,32 +326,32 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           performanceMetrics.cacheHits++;
           
           const cacheResponse: ApiResponse<T> = {
-            data: cachedData.data,
+            data: cachedData.data as T,
             error: null,
             status: cachedData.status,
             headers: cachedData.headers,
             fromCache: true,
-            requestId,
+            requestId: requestId,
             timestamp: cachedData.timestamp,
           };
 
           safeSetState(prev => ({
             ...prev,
-            data: cachedData.data,
+            data: cachedData.data as T,
             status: cachedData.status,
             headers: cachedData.headers,
             fromCache: true,
-            requestId,
+            requestId: requestId,
             isLoading: false,
             error: null,
             lastRequestTime: Date.now(),
             progress: null,
             retryCount: 0,
-            loaded: 100,
-            total: 100,
+            loaded: 0,
+            total: 0,
           }));
 
-          onSuccess?.(cachedData.data, new Response());
+          onSuccess?.(cachedData.data as T, new Response());
 
           // Background refresh for stale-while-revalidate
           if (cacheStrategy === 'stale-while-revalidate' && backgroundRefresh) {
