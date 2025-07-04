@@ -6,8 +6,8 @@ import { SummaryView } from '@/components/SummaryView';
 import { Button } from '@/components/ui/button';
 import { Download, Mail, Calendar as CalendarIcon } from 'lucide-react';
 
-// Mock data type - replace with your actual data structure
-type MeetingSummary = {
+// This type now matches the strict structure expected by the child components.
+type AnalysisResult = {
   id: string;
   title: string;
   date: string;
@@ -16,18 +16,18 @@ type MeetingSummary = {
   summary: string;
   keyPoints: string[];
   actionItems: Array<{
-    id: string;
+    id: string; // Now required
     task: string;
-    assignee: string;
-    dueDate: string;
-    completed: boolean;
+    assignee: string; // Now required
+    dueDate: string; // Now required
+    completed: boolean; // Now required
   }>;
 };
 
 export default function ResultsPage() {
   const searchParams = useSearchParams();
   const fileKey = searchParams.get('fileKey');
-  const [summary, setSummary] = useState<MeetingSummary | null>(null);
+  const [summary, setSummary] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -42,47 +42,46 @@ export default function ResultsPage() {
       }
 
       try {
-        // In a real app, you would fetch the summary from your API
-        // const response = await fetch(`/api/summary/${sessionId}`);
-        // const data = await response.json();
-        
-        // Mock data for demonstration
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-        
-        const mockData: MeetingSummary = {
-          id: fileKey,
-          title: 'Team Sync Meeting',
-          date: new Date().toLocaleDateString(),
-          duration: '1 hour',
-          participants: ['john@example.com', 'jane@example.com'],
-          summary: 'The team discussed the current project status and upcoming deadlines. Key decisions were made regarding the implementation approach for the new features.',
-          keyPoints: [
-            'Project is on track for the Q1 release',
-            'New feature implementation will start next week',
-            'Code review process was updated to include additional checks'
-          ],
-          actionItems: [
-            {
-              id: '1',
-              task: 'Update project timeline with new deadlines',
-              assignee: 'john@example.com',
-              dueDate: '2023-06-15',
-              completed: false
-            },
-            {
-              id: '2',
-              task: 'Prepare demo for the new features',
-              assignee: 'jane@example.com',
-              dueDate: '2023-06-20',
-              completed: false
+        const response = await fetch(`/api/summarize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileKey }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("API Error Response:", errorText);
+            let errorMessage = `Request failed: ${response.status} ${response.statusText}`;
+            try {
+                // If the API returns a structured JSON error, use its message
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.details || errorJson.error || errorMessage;
+            } catch (e) {
+                // If it's not JSON, it's likely an HTML error page.
+                // The console log above is the most useful for debugging.
             }
-          ]
-        };
+            throw new Error(errorMessage);
+        }
         
-        setSummary(mockData);
+        const data = await response.json();
+
+        // Transform data to ensure it matches the strict structure expected by components.
+        const transformedData: AnalysisResult = {
+            ...data,
+            actionItems: data.actionItems.map((item: any, index: number) => ({
+                task: item.task || 'Unnamed Task',
+                assignee: item.assignee || 'Unassigned',
+                dueDate: item.dueDate || 'N/A',
+                id: item.id || `action-item-${index}`,
+                completed: item.completed === true, // Ensure it's a boolean
+            })),
+        };
+
+        setSummary(transformedData);
+
       } catch (err) {
         console.error('Error fetching summary:', err);
-        setError('Failed to load meeting summary');
+        setError(err instanceof Error ? err.message : 'Failed to load analysis');
       } finally {
         setIsLoading(false);
       }
@@ -93,13 +92,13 @@ export default function ResultsPage() {
 
   const handleExportPDF = () => {
     // This would be implemented using a PDF generation library
-    console.log('Exporting to PDF');
+    // console.log('Exporting to PDF');
     alert('PDF export functionality will be implemented here');
   };
 
   const handleSendEmail = async (email: string, subject: string, content: string) => {
+    setIsSendingEmail(true);
     try {
-      setIsSendingEmail(true);
       const response = await fetch('/api/email', {
         method: 'POST',
         headers: {
@@ -113,13 +112,15 @@ export default function ResultsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send email');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send email');
       }
 
-      setShowEmailForm(false);
-    } catch (err) {
-      console.error('Error sending email:', err);
-      setError('Failed to send email. Please try again.');
+      alert('Email sent successfully!');
+      setShowEmailForm(false); // Hide form on success
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      alert(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsSendingEmail(false);
     }
@@ -221,11 +222,11 @@ export default function ResultsPage() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => setShowEmailForm(!showEmailForm)}
+            onClick={() => setShowEmailForm(true)}
             disabled={isSendingEmail}
           >
             <Mail className="mr-2 h-4 w-4" />
-            {isSendingEmail ? 'Sending...' : 'Email Summary'}
+            {isSendingEmail ? 'Sending...' : 'Send Email'}
           </Button>
           <Button 
             variant="outline" 

@@ -9,7 +9,7 @@ import { useUploadThing } from '@/utils/uploadthing';
 
 interface UploadedFile {
   key: string;
-  url: string;
+  ufsUrl: string;
   name: string;
   size: number;
   type: string;
@@ -38,6 +38,22 @@ const SUPPORTED_FORMATS = {
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 const CHUNK_SIZE = 1024 * 1024; // 1MB chunks for better performance
+
+// Client-side component to prevent hydration errors from Math.random()
+const RandomProcessingTime = () => {
+  const [time, setTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    // This runs only on the client, after hydration
+    setTime(Math.round(Math.random() * 120 + 30));
+  }, []);
+
+  return (
+    <span className="text-slate-500 dark:text-slate-400">
+      {time !== null ? `~${time}s` : '...'}
+    </span>
+  );
+};
 
 export default function EnhancedInsightMeet() {
   const router = useRouter();
@@ -75,7 +91,7 @@ export default function EnhancedInsightMeet() {
         const file = res[0];
         const fileData: UploadedFile = {
           key: file.key,
-          url: file.url,
+          ufsUrl: file.ufsUrl,
           name: file.name,
           size: file.size,
           type: file.type || 'unknown',
@@ -107,22 +123,27 @@ export default function EnhancedInsightMeet() {
       
       // Calculate upload speed and ETA
       const now = Date.now();
-      const elapsedTime = (now - uploadStartTime.current) / 1000; // seconds
-      const currentBytes = (progress / 100) * uploadedBytesRef.current;
-      const speed = currentBytes / elapsedTime; // bytes per second
-      const remainingBytes = uploadedBytesRef.current - currentBytes;
-      const estimatedTime = remainingBytes / speed;
-      
-      setUploadSpeed(speed);
-      setEta(estimatedTime);
+      const elapsedTime = (now - uploadStartTime.current) / 1000; // in seconds
+
+      if (elapsedTime > 0.1) { // Start calculating after a short delay to get a stable speed
+        const currentBytes = (progress / 100) * uploadedBytesRef.current;
+        const speed = currentBytes / elapsedTime; // bytes per second
+        const remainingBytes = uploadedBytesRef.current - currentBytes;
+        const estimatedTime = speed > 0 ? remainingBytes / speed : Infinity;
+        
+        setUploadSpeed(speed);
+        setEta(estimatedTime);
+      }
       
       // Update processing stage
-      if (progress < 30) {
+      if (progress < 1) {
+        setProcessingStage('Initializing...');
+      } else if (progress < 30) {
         setProcessingStage('Uploading file...');
       } else if (progress < 60) {
         setProcessingStage('Validating content...');
       } else if (progress < 90) {
-        setProcessingStage('Optimizing for processing...');
+        setProcessingStage('Optimizing for analysis...');
       } else {
         setProcessingStage('Finalizing upload...');
       }
@@ -132,14 +153,22 @@ export default function EnhancedInsightMeet() {
   // Optimized file validation
   const validateFile = useCallback((file: File): {isValid: boolean; message: string} => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+    if (!fileExtension) {
+      return {
+        isValid: false,
+        message: 'File has no extension.'
+      };
+    }
+
     const isValidFormat = Object.values(SUPPORTED_FORMATS).some(formats => 
-      formats.includes(fileExtension as any)
+      (formats as readonly string[]).includes(fileExtension)
     );
     
     if (!isValidFormat) {
       return {
         isValid: false,
-        message: `Unsupported file format: ${fileExtension?.toUpperCase()}`
+        message: `Unsupported format: .${fileExtension.toUpperCase()}`
       };
     }
     
@@ -150,16 +179,16 @@ export default function EnhancedInsightMeet() {
       };
     }
     
-    if (file.size < 1024) {
+    if (file.size === 0) {
       return {
         isValid: false,
-        message: 'File too small to contain meaningful content'
+        message: 'File is empty.'
       };
     }
     
     return {
       isValid: true,
-      message: 'File validation passed'
+      message: 'File is valid'
     };
   }, []);
 
@@ -218,15 +247,22 @@ export default function EnhancedInsightMeet() {
 
   // Format upload speed for display
   const formatUploadSpeed = useCallback((bytesPerSecond: number) => {
+    if (!isFinite(bytesPerSecond) || bytesPerSecond <= 0) {
+      return '...';
+    }
     const mbps = bytesPerSecond / (1024 * 1024);
     if (mbps >= 1) {
       return `${mbps.toFixed(1)} MB/s`;
     }
-    return `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
+    const kbps = bytesPerSecond / 1024;
+    return `${kbps.toFixed(1)} KB/s`;
   }, []);
 
   // Format ETA
   const formatETA = useCallback((seconds: number) => {
+    if (!isFinite(seconds) || seconds < 0) {
+      return '...';
+    }
     if (seconds < 60) {
       return `${Math.round(seconds)}s`;
     }
@@ -436,9 +472,7 @@ export default function EnhancedInsightMeet() {
                               <span className="px-2 py-1 bg-white dark:bg-slate-600 text-slate-600 dark:text-slate-300 rounded">
                                 {format}
                               </span>
-                              <span className="text-slate-500 dark:text-slate-400">
-                                ~{Math.round(Math.random() * 120 + 30)}s
-                              </span>
+                              <RandomProcessingTime />
                             </div>
                           ))}
                         </div>
