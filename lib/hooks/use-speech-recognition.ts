@@ -171,6 +171,7 @@ declare global {
     webkitSpeechGrammarList: { new(): SpeechGrammarList }
     performance: Performance & {
       readonly timeOrigin: DOMHighResTimeStamp;
+      now(): DOMHighResTimeStamp;
     }
   }
 

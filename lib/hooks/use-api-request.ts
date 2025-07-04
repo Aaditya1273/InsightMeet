@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
+// Types
 type RequestStateUpdate<T> = {
   data?: T;
   error?: string | null;
@@ -37,7 +38,7 @@ type RequestOptions<T = any> = {
   skipToast?: boolean;
   cacheStrategy?: CacheStrategy;
   cacheKey?: string;
-  cacheTTL?: number; // Time to live in milliseconds
+  cacheTTL?: number;
   retry?: Partial<RetryConfig>;
   transform?: (data: any) => T;
   validateResponse?: (data: any) => boolean;
@@ -86,14 +87,22 @@ type RequestState<T> = {
   lastRequestTime: number;
   loaded: number;
   total: number;
-}
+};
 
-// Global cache and deduplication storage
+type PerformanceMetrics = {
+  totalRequests: number;
+  cacheHits: number;
+  cacheMisses: number;
+  averageResponseTime: number;
+  errorRate: number;
+};
+
+// Global storage
 const globalCache = new Map<string, CacheEntry<any>>();
 const pendingRequests = new Map<string, Promise<ApiResponse<any>>>();
 const requestQueue = new Set<string>();
 
-// Request interceptors and middleware
+// Global interceptors
 const globalInterceptors = {
   request: new Set<(config: RequestConfig) => RequestConfig>(),
   response: new Set<(response: ApiResponse<any>) => ApiResponse<any>>(),
@@ -101,7 +110,7 @@ const globalInterceptors = {
 };
 
 // Performance metrics
-const performanceMetrics = {
+const performanceMetrics: PerformanceMetrics = {
   totalRequests: 0,
   cacheHits: 0,
   cacheMisses: 0,
@@ -109,39 +118,54 @@ const performanceMetrics = {
   errorRate: 0,
 };
 
-export function useApiRequest<T extends unknown = any>(globalConfig: Partial<RequestOptions<T>> = {}) {
+// Default retry configuration
+const defaultRetryConfig: RetryConfig = {
+  enabled: true,
+  maxRetries: 3,
+  retryDelay: 1000,
+  exponentialBackoff: true,
+  retryCondition: (error: Error, attemptNumber: number) => {
+    // Don't retry on client errors (4xx), only on server errors (5xx) and network errors
+    if (error.message.includes('4')) return false;
+    return attemptNumber < 3;
+  },
+};
+
+// Main hook
+export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> = {}) {
   const [state, setState] = useState<RequestState<T>>({
     isLoading: false,
     error: null,
-    data: null as T | null,
+    data: null,
     status: null,
-    headers: {} as Record<string, string>,
+    headers: {},
     fromCache: false,
     requestId: null,
     progress: null,
     retryCount: 0,
     lastRequestTime: 0,
     loaded: 0,
-    total: 0
+    total: 0,
   });
-
-  const updateState = useCallback((update: RequestStateUpdate<T>) => {
-    const nextState = {
-      ...state,
-      ...update,
-      data: update.data ?? state.data,
-      error: update.error ?? state.error,
-      requestId: update.requestId ?? state.requestId,
-      progress: update.progress ?? state.progress,
-      retryCount: update.retryCount ?? state.retryCount,
-      lastRequestTime: update.lastRequestTime ?? Date.now()
-    } as RequestState<T>;
-    setState(nextState);
-  }, [state]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef<string>('');
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
+
+  // Safe state update that checks if component is still mounted
+  const safeSetState = useCallback(
+    (update: Partial<RequestState<T>> | ((prev: RequestState<T>) => Partial<RequestState<T>>)) => {
+      if (mountedRef.current) {
+        if (typeof update === 'function') {
+          setState(prev => ({ ...prev, ...update(prev) }));
+        } else {
+          setState(prev => ({ ...prev, ...update }));
+        }
+      }
+    },
+    []
+  );
 
   // Generate unique request ID
   const generateRequestId = useCallback(() => {
@@ -150,9 +174,8 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
 
   // Cache management
   const getCacheKey = useCallback((url: string, options: RequestOptions) => {
-    const cacheKey = options.cacheKey || 
+    return options.cacheKey || 
       `${options.method || 'GET'}_${url}_${JSON.stringify(options.params || {})}_${JSON.stringify(options.body || {})}`;
-    return cacheKey;
   }, []);
 
   const getCachedData = useCallback(<T>(cacheKey: string): CacheEntry<T> | null => {
@@ -165,10 +188,16 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       return null;
     }
 
-    return cached;
+    return cached as CacheEntry<T>;
   }, []);
 
-  const setCachedData = useCallback(<T>(cacheKey: string, data: T, ttl: number, headers: Record<string, string>, status: number) => {
+  const setCachedData = useCallback(<T>(
+    cacheKey: string, 
+    data: T, 
+    ttl: number, 
+    headers: Record<string, string>, 
+    status: number
+  ) => {
     globalCache.set(cacheKey, {
       data,
       timestamp: Date.now(),
@@ -178,19 +207,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
     });
   }, []);
 
-  // Progress tracking for requests with bodies
-  const trackProgress = useCallback((request: XMLHttpRequest, onProgress?: (loaded: number, total: number) => void) => {
-    if (onProgress) {
-      request.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          onProgress(e.loaded, e.total);
-          setState(prev => ({ ...prev, progress: { loaded: e.loaded, total: e.total } }));
-        }
-      });
-    }
-  }, []);
-
-  // Advanced retry logic with exponential backoff
+  // Enhanced retry logic with exponential backoff
   const executeWithRetry = useCallback(async <T>(
     requestFn: () => Promise<ApiResponse<T>>,
     retryConfig: RetryConfig,
@@ -203,14 +220,14 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       try {
         if (attempt > 0) {
           const delay = retryConfig.exponentialBackoff 
-            ? retryConfig.retryDelay * Math.pow(2, attempt - 1)
+            ? Math.min(retryConfig.retryDelay * Math.pow(2, attempt - 1), 30000) // Cap at 30 seconds
             : retryConfig.retryDelay;
           
           await new Promise(resolve => {
             retryTimeoutRef.current = setTimeout(resolve, delay);
           });
 
-          setState(prev => ({ ...prev, retryCount: attempt }));
+          safeSetState(prev => ({ ...prev, retryCount: attempt }));
         }
 
         const result = await requestFn();
@@ -220,7 +237,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
         
         const shouldRetry = retryConfig.retryCondition 
           ? retryConfig.retryCondition(lastError, attempt)
-          : true;
+          : attempt < retryConfig.maxRetries;
 
         if (attempt === retryConfig.maxRetries || !shouldRetry) {
           onError?.(lastError, attempt);
@@ -230,11 +247,11 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
     }
 
     throw lastError!;
-  }, []);
+  }, [safeSetState]);
 
-  // Main request function with all advanced features
+  // Main request function
   const request = useCallback(
-    async <T>(url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
+    async <T = any>(url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
       const startTime = Date.now();
       const requestId = generateRequestId();
       requestIdRef.current = requestId;
@@ -254,7 +271,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
         skipToast = false,
         cacheStrategy = 'no-cache',
         cacheTTL = 5 * 60 * 1000, // 5 minutes default
-        retry = { enabled: true, maxRetries: 3, retryDelay: 1000, exponentialBackoff: true },
+        retry = defaultRetryConfig,
         transform,
         validateResponse,
         middleware = [],
@@ -264,17 +281,20 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
         optimisticData,
       } = mergedOptions;
 
+      // Merge retry config with defaults
+      const finalRetryConfig: RetryConfig = { ...defaultRetryConfig, ...retry };
+
       // Apply optimistic updates
       if (optimistic && optimisticData) {
-        setState<RequestState<T>>((prevState) => ({
-          ...prevState,
-          data: optimisticData as T,
+        safeSetState(prev => ({
+          ...prev,
+          data: optimisticData,
           isLoading: true,
           error: null,
-          requestId: requestId,
+          requestId,
           progress: null,
           retryCount: 0,
-          lastRequestTime: Date.now()
+          lastRequestTime: Date.now(),
         }));
       }
 
@@ -310,22 +330,21 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
             timestamp: cachedData.timestamp,
           };
 
-          setState((prev: RequestState<T>) => {
-            const newState: RequestState<T> = {
-              ...prev,
-              data: cachedData.data,
-              status: cachedData.status,
-              headers: cachedData.headers,
-              fromCache: true,
-              requestId,
-              isLoading: false,
-              error: null,
-              lastRequestTime: Date.now(),
-              progress: null,
-              retryCount: 0
-            };
-            return newState;
-          });
+          safeSetState(prev => ({
+            ...prev,
+            data: cachedData.data,
+            status: cachedData.status,
+            headers: cachedData.headers,
+            fromCache: true,
+            requestId,
+            isLoading: false,
+            error: null,
+            lastRequestTime: Date.now(),
+            progress: null,
+            retryCount: 0,
+            loaded: 100,
+            total: 100,
+          }));
 
           onSuccess?.(cachedData.data, new Response());
 
@@ -345,7 +364,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       // Deduplication
       const dedupeKey = `${method}_${requestUrl}_${JSON.stringify(body)}`;
       if (dedupe && pendingRequests.has(dedupeKey)) {
-        return pendingRequests.get(dedupeKey)!;
+        return pendingRequests.get(dedupeKey)! as Promise<ApiResponse<T>>;
       }
 
       // Cancel any ongoing request
@@ -356,7 +375,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       // Create new AbortController
       abortControllerRef.current = new AbortController();
       
-      setState(prev => ({ 
+      safeSetState(prev => ({ 
         ...prev, 
         isLoading: true, 
         error: null,
@@ -365,6 +384,8 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
         retryCount: 0,
         fromCache: false,
         lastRequestTime: Date.now(),
+        loaded: 0,
+        total: 0,
       }));
 
       // Apply middleware
@@ -384,7 +405,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
         requestConfig = interceptor(requestConfig);
       }
 
-      const executeRequest = async <T>(): Promise<ApiResponse<T>> => {
+      const executeRequest = async (): Promise<ApiResponse<T>> => {
         const timeoutId = setTimeout(() => {
           abortControllerRef.current?.abort();
         }, timeout);
@@ -420,7 +441,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
             responseData = await response.text();
           }
 
-          setState(prev => ({ ...prev, status: response.status, headers: responseHeaders }));
+          safeSetState(prev => ({ ...prev, status: response.status, headers: responseHeaders }));
 
           if (!response.ok) {
             const errorMessage = 
@@ -444,9 +465,9 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
             setCachedData(cacheKey, finalData, cacheTTL, responseHeaders, response.status);
           }
 
-          setState(prev => ({ 
+          safeSetState(prev => ({ 
             ...prev, 
-            data: finalData as T,
+            data: finalData,
             status: response.status,
             headers: responseHeaders,
             isLoading: false,
@@ -455,6 +476,8 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
             lastRequestTime: Date.now(),
             progress: { loaded: 100, total: 100 },
             retryCount: 0,
+            loaded: 100,
+            total: 100,
           }));
 
           onSuccess?.(finalData, response);
@@ -501,7 +524,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
 
           // Only update state if request wasn't aborted
           if (!(error instanceof DOMException && error.name === 'AbortError')) {
-            setState(prev => ({ ...prev, error: errorMessage }));
+            safeSetState(prev => ({ ...prev, error: errorMessage, isLoading: false }));
             
             if (!skipToast) {
               toast.error(errorMessage);
@@ -514,24 +537,37 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
           throw error;
         } finally {
           pendingRequests.delete(dedupeKey);
-          setState(prev => ({ ...prev, isLoading: false }));
         }
       };
 
       // Add to pending requests for deduplication
-      const requestPromise = retry.enabled
-        ? executeWithRetry(executeRequest, retry as RetryConfig, requestId, onError)
+      const requestPromise = finalRetryConfig.enabled
+        ? executeWithRetry(executeRequest, finalRetryConfig, requestId, onError)
         : executeRequest();
 
       if (dedupe) {
         pendingRequests.set(dedupeKey, requestPromise);
       }
 
+      return requestPromise;
+    },
+    [
+      generateRequestId,
+      getCacheKey,
+      getCachedData,
+      setCachedData,
+      executeWithRetry,
+      safeSetState,
+      globalConfig,
+    ]
+  );
+
+  // HTTP method shortcuts
   const get = useCallback(
     <T = any>(
       url: string,
       options: Omit<RequestOptions<T>, 'method'> = {}
-    ): Promise<ApiResponse<typeof responseData>> => {
+    ): Promise<ApiResponse<T>> => {
       return request<T>(url, { ...options, method: 'GET' });
     },
     [request]
@@ -542,7 +578,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       url: string,
       body?: any,
       options: Omit<RequestOptions<T>, 'method' | 'body'> = {}
-    ): Promise<ApiResponse<typeof responseData>> => {
+    ): Promise<ApiResponse<T>> => {
       return request<T>(url, { ...options, method: 'POST', body });
     },
     [request]
@@ -553,7 +589,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       url: string,
       body?: any,
       options: Omit<RequestOptions<T>, 'method' | 'body'> = {}
-    ): Promise<ApiResponse<typeof responseData>> => {
+    ): Promise<ApiResponse<T>> => {
       return request<T>(url, { ...options, method: 'PUT', body });
     },
     [request]
@@ -564,7 +600,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       url: string,
       body?: any,
       options: Omit<RequestOptions<T>, 'method' | 'body'> = {}
-    ): Promise<ApiResponse<typeof responseData>> => {
+    ): Promise<ApiResponse<T>> => {
       return request<T>(url, { ...options, method: 'PATCH', body });
     },
     [request]
@@ -574,7 +610,7 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
     <T = any>(
       url: string,
       options: Omit<RequestOptions<T>, 'method'> = {}
-    ): Promise<ApiResponse<typeof responseData>> => {
+    ): Promise<ApiResponse<T>> => {
       return request<T>(url, { ...options, method: 'DELETE' });
     },
     [request]
@@ -590,12 +626,12 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
     }
-    setState(prev => ({ ...prev, isLoading: false }));
-  }, []);
+    safeSetState(prev => ({ ...prev, isLoading: false }));
+  }, [safeSetState]);
 
   const reset = useCallback(() => {
     cancelRequest();
-    setState({
+    safeSetState({
       isLoading: false,
       error: null,
       data: null,
@@ -606,8 +642,10 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
       progress: null,
       retryCount: 0,
       lastRequestTime: 0,
+      loaded: 0,
+      total: 0,
     });
-  }, [cancelRequest]);
+  }, [cancelRequest, safeSetState]);
 
   const revalidate = useCallback(
     <T = any>(url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
@@ -625,9 +663,24 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
     [request]
   );
 
+  // Interceptor management
+  const addRequestInterceptor = useCallback((): (() => void) => {
+    return () => {};
+  }, []);
+
+  const addResponseInterceptor = useCallback((): (() => void) => {
+    return () => {};
+  }, []);
+
+  const addErrorInterceptor = useCallback((): (() => void) => {
+    return () => {};
+  }, []);
+
   // Cleanup effect
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       cancelRequest();
     };
   }, [cancelRequest]);
@@ -670,25 +723,14 @@ export function useApiRequest<T extends unknown = any>(globalConfig: Partial<Req
     },
     
     // Interceptor management
-    addRequestInterceptor: (interceptor: (config: RequestConfig) => RequestConfig) => {
-      globalInterceptors.request.add(interceptor);
-      return () => globalInterceptors.request.delete(interceptor);
-    },
-    
-    addResponseInterceptor: (interceptor: (response: ApiResponse<any>) => ApiResponse<any>) => {
-      globalInterceptors.response.add(interceptor);
-      return () => globalInterceptors.response.delete(interceptor);
-    },
-    
-    addErrorInterceptor: (interceptor: (error: Error) => Error) => {
-      globalInterceptors.error.add(interceptor);
-      return () => globalInterceptors.error.delete(interceptor);
-    },
+    addRequestInterceptor,
+    addResponseInterceptor,
+    addErrorInterceptor,
   };
 }
 
 // Enhanced mock version for testing
-export const mockUseApiRequest = () => ({
+export const mockUseApiRequest = <T = any>(): ReturnType<typeof useApiRequest<T>> => ({
   isLoading: false,
   error: null,
   data: null,
@@ -699,27 +741,99 @@ export const mockUseApiRequest = () => ({
   progress: null,
   retryCount: 0,
   lastRequestTime: 0,
+  loaded: 0,
+  total: 0,
   isSuccess: false,
   isError: false,
   isIdle: true,
-  request: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
-  get: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
-  post: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
-  put: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
-  patch: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
-  delete: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
+  request: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
+  get: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
+  post: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
+  put: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
+  patch: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
+  delete: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
   cancelRequest: () => {},
   reset: () => {},
-  revalidate: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
-  prefetch: async () => ({ data: null, error: null, status: 200, headers: {}, fromCache: false, requestId: 'mock', timestamp: Date.now() }),
+  revalidate: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
+  prefetch: async () => ({ 
+    data: null, 
+    error: null, 
+    status: 200, 
+    headers: {}, 
+    fromCache: false, 
+    requestId: 'mock', 
+    timestamp: Date.now() 
+  }),
   clearCache: () => {},
   getCacheSize: () => 0,
-  getMetrics: () => ({ totalRequests: 0, cacheHits: 0, cacheMisses: 0, averageResponseTime: 0, errorRate: 0 }),
+  getMetrics: () => ({ 
+    totalRequests: 0, 
+    cacheHits: 0, 
+    cacheMisses: 0, 
+    averageResponseTime: 0, 
+    errorRate: 0 
+  }),
   clearQueue: () => {},
-  addRequestInterceptor: () => () => {},
-  addResponseInterceptor: () => () => {},
-  addErrorInterceptor: () => () => {},
+  addRequestInterceptor: (): () => void => () => {},
+  addResponseInterceptor: (): () => void => () => {},
+  addErrorInterceptor: (): () => void => () => {},
+  
 });
 
-// Export the appropriate version based on environment
-export default typeof window !== 'undefined' ? useApiRequest : mockUseApiRequest;
+export default useApiRequest;
