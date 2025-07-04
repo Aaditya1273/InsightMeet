@@ -8,7 +8,7 @@ export const config = {
     baseUrl: process.env.NEXT_PUBLIC_API_URL || '/api',
     endpoints: {
       upload: '/upload',
-      summarize: '/summarize',
+      summary: '/summary',
       email: '/email',
       calendar: '/calendar',
     },

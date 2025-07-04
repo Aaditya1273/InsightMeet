@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { SummaryView } from '@/components/SummaryView';
 import { Button } from '@/components/ui/button';
 import { Download, Mail, Calendar as CalendarIcon } from 'lucide-react';
@@ -16,78 +16,57 @@ type AnalysisResult = {
   summary: string;
   keyPoints: string[];
   actionItems: Array<{
-    id: string; // Now required
+    id: string;
     task: string;
-    assignee: string; // Now required
-    dueDate: string; // Now required
-    completed: boolean; // Now required
+    assignee: string;
+    dueDate: string;
+    completed: boolean;
   }>;
 };
 
 export default function ResultsPage() {
-  const searchParams = useSearchParams();
-  const fileKey = searchParams.get('fileKey');
-  const [summary, setSummary] = useState<AnalysisResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { fileKey } = useParams();
+  const [summaryData, setSummaryData] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
 
   useEffect(() => {
     const fetchSummary = async () => {
-      if (!fileKey) {
-        setError('No file key provided');
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        const response = await fetch(`/api/summarize`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileKey }),
+        setLoading(true);
+        const response = await fetch("/api/summary", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fileKey }),
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error("API Error Response:", errorText);
-            let errorMessage = `Request failed: ${response.status} ${response.statusText}`;
-            try {
-                // If the API returns a structured JSON error, use its message
-                const errorJson = JSON.parse(errorText);
-                errorMessage = errorJson.details || errorJson.error || errorMessage;
-            } catch (e) {
-                // If it's not JSON, it's likely an HTML error page.
-                // The console log above is the most useful for debugging.
-            }
-            throw new Error(errorMessage);
+          const html = await response.text();
+          console.error("API Error Response:", html);
+          throw new Error("Request failed: " + response.status + " " + response.statusText);
         }
-        
+
         const data = await response.json();
-
-        // Transform data to ensure it matches the strict structure expected by components.
-        const transformedData: AnalysisResult = {
-            ...data,
-            actionItems: data.actionItems.map((item: any, index: number) => ({
-                task: item.task || 'Unnamed Task',
-                assignee: item.assignee || 'Unassigned',
-                dueDate: item.dueDate || 'N/A',
-                id: item.id || `action-item-${index}`,
-                completed: item.completed === true, // Ensure it's a boolean
-            })),
-        };
-
-        setSummary(transformedData);
-
+        console.log("✅ Summary:", data);
+        setSummaryData(data);
+        setLoading(false);
       } catch (err) {
-        console.error('Error fetching summary:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load analysis');
-      } finally {
-        setIsLoading(false);
+        console.error("❌ Error fetching summaryData:", err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch summaryData');
+        setLoading(false);
       }
     };
 
-    fetchSummary();
+    if (fileKey) {
+      fetchSummary();
+    } else {
+      setError('No file key provided');
+      setLoading(false);
+    }
   }, [fileKey]);
 
   const handleExportPDF = () => {
@@ -127,7 +106,7 @@ export default function ResultsPage() {
   };
 
   const handleExportICS = async () => {
-    if (!summary) return;
+    if (!summaryData) return;
     
     try {
       const response = await fetch('/api/calendar', {
@@ -136,11 +115,11 @@ export default function ResultsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: summary.title,
-          description: summary.summary,
+          title: summaryData.title,
+          description: summaryData.summary,
           startTime: new Date().toISOString(),
           duration: 1, // Default to 1 hour
-          attendees: summary.participants,
+          attendees: summaryData.participants,
         }),
       });
 
@@ -153,7 +132,7 @@ export default function ResultsPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${summary.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+      a.download = `${summaryData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -164,12 +143,12 @@ export default function ResultsPage() {
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Generating your meeting summary...</p>
+          <p className="text-muted-foreground">Generating your meeting summaryData...</p>
         </div>
       </div>
     );
@@ -192,12 +171,12 @@ export default function ResultsPage() {
     );
   }
 
-  if (!summary) {
+  if (!summaryData) {
     return (
       <div className="max-w-3xl mx-auto p-6">
         <div className="bg-muted/50 border rounded-md p-6 text-center">
-          <h2 className="text-xl font-semibold mb-2">No meeting summary found</h2>
-          <p className="text-muted-foreground mb-4">We couldn't find a meeting summary for this session.</p>
+          <h2 className="text-xl font-semibold mb-2">No meeting summaryData found</h2>
+          <p className="text-muted-foreground mb-4">We couldn't find a meeting summaryData for this session.</p>
           <Button onClick={() => window.location.href = '/'}>
             Start a New Meeting
           </Button>
@@ -252,7 +231,7 @@ export default function ResultsPage() {
                   type="email"
                   placeholder="recipient@example.com"
                   className="w-full px-3 py-2 border rounded-md"
-                  defaultValue={summary.participants.join(', ')}
+                  defaultValue={summaryData?.participants?.join(', ') || ''}
                 />
               </div>
               <div>
@@ -263,7 +242,7 @@ export default function ResultsPage() {
                   type="text"
                   placeholder="Meeting Summary"
                   className="w-full px-3 py-2 border rounded-md"
-                  defaultValue={`Meeting Summary: ${summary.title}`}
+                  defaultValue={summaryData?.title ? `Meeting Summary: ${summaryData.title}` : 'Meeting Summary'}
                 />
               </div>
               <div>
@@ -277,13 +256,13 @@ export default function ResultsPage() {
 
 Here's the summary of our meeting:
 
-${summary.summary}
+${summaryData.summary}
 
 Key Points:
-${summary.keyPoints.map(point => `• ${point}`).join('\n')}
+${summaryData.keyPoints.map(point => `• ${point}`).join('\n')}
 
 Action Items:
-${summary.actionItems.map(item => `- ${item.task} (${item.assignee} - Due: ${item.dueDate})`).join('\n')}
+${summaryData.actionItems.map(item => `- ${item.task} (${item.assignee} - Due: ${item.dueDate})`).join('\n')}
 
 Best regards,
 [Your Name]`}
@@ -317,7 +296,7 @@ Best regards,
       )}
 
       <SummaryView
-        data={summary}
+        data={summaryData}
         onExportPDF={handleExportPDF}
         onSendEmail={() => setShowEmailForm(true)}
         onExportICS={handleExportICS}

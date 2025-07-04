@@ -72,7 +72,13 @@ export function useFileUpload({
               if (xhr.status >= 200 && xhr.status < 300) {
                 try {
                   const response = JSON.parse(xhr.responseText);
-                  resolve({ success: true, data: response });
+                  resolve({ 
+                    success: true, 
+                    data: { 
+                      fileKey: response.fileKey,
+                      url: response.ufsUrl 
+                    }
+                  });
                 } catch (e) {
                   resolve({ 
                     success: false, 
