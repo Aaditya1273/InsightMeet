@@ -359,7 +359,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
             total: 0
           }));
 
-          onSuccess?.(cachedData.data as unknown as TLocal, new Response());
+          onSuccess?.(cachedData.data as unknown as TLocal & T, new Response());
 
           // Background refresh for stale-while-revalidate
           if (cacheStrategy === 'stale-while-revalidate' && backgroundRefresh) {
@@ -480,7 +480,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
           safeSetState(prev => ({ 
             ...prev, 
-            data: finalData,
+            data: finalData as unknown as T,
             status: response.status,
             headers: responseHeaders,
             isLoading: false,
@@ -493,7 +493,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
             total: 100,
           }));
 
-          onSuccess?.(finalData, response);
+          onSuccess?.(finalData as unknown as TLocal & T, response);
 
           if (!skipToast) {
             toast.success('Request completed successfully');
