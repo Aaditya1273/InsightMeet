@@ -246,7 +246,7 @@ class SpeechProcessor {
   }
   
   processResult(result: SpeechResult): void {
-    const processingStart = performance.now();
+    const processingStart = window.performance.now();
     
     // Word counting with smart detection
     const words = result.transcript.trim().split(/\s+/).filter(Boolean);
@@ -256,7 +256,7 @@ class SpeechProcessor {
     this.confidenceScores.push(result.confidence);
     
     // Performance tracking
-    this.processingTimes.push(performance.now() - processingStart);
+    this.processingTimes.push(window.performance.now() - processingStart);
   }
   
   getAnalytics(): SpeechAnalytics {
@@ -479,7 +479,7 @@ export function useSpeechRecognition(
     
     // Event handlers with advanced processing
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const processingStart = performance.now();
+      const processingStart = window.performance.now();
       setIsProcessing(true);
       
       let interimText = '';
@@ -531,7 +531,7 @@ export function useSpeechRecognition(
       });
       
       // Update performance metrics
-      const processingTime = performance.now() - processingStart;
+      const processingTime = window.performance.now() - processingStart;
       setPerformance(prev => ({
         ...prev,
         processingTime,
