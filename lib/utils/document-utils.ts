@@ -1,6 +1,6 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import { saveAs } from 'file-saver';
-import ics from 'ics';
+import * as ics from 'ics';
 
 /**
  * Generates a PDF summary document from analysis results
@@ -83,28 +83,39 @@ export async function generateSummaryPDF(result: any) {
 }
 
 /**
- * Generates an ICS calendar event from meeting details
+ * Generates a calendar event (.ics file) from analysis results
  */
 export function generateCalendarEvent(result: any) {
   const { title, date, duration, participants } = result;
-  
+
   // Parse date and duration
   const startDate = new Date(date);
   const endDate = new Date(date);
   endDate.setMinutes(endDate.getMinutes() + (duration || 60));
 
   // Create calendar event
-  const event = {
+  const event: ics.EventAttributes = {
     title: title || 'Meeting',
-    start: [startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate(),
-            startDate.getHours(), startDate.getMinutes()],
-    end: [endDate.getFullYear(), endDate.getMonth() + 1, endDate.getDate(),
-           endDate.getHours(), endDate.getMinutes()],
+    start: [
+      startDate.getFullYear(),
+      startDate.getMonth() + 1,
+      startDate.getDate(),
+      startDate.getHours(),
+      startDate.getMinutes(),
+    ],
+    end: [
+      endDate.getFullYear(),
+      endDate.getMonth() + 1,
+      endDate.getDate(),
+      endDate.getHours(),
+      endDate.getMinutes(),
+    ],
     description: result.summary || 'Meeting summary',
-    attendees: participants?.map(p => ({
-      email: p,
-      rsvp: true
-    })) || [],
+    attendees:
+      participants?.map((p: any) => ({
+        email: p,
+        rsvp: true,
+      })) || [],
   };
 
   // Generate ICS file
