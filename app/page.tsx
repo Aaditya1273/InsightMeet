@@ -87,29 +87,19 @@ export default function EnhancedInsightMeet() {
 
   const { startUpload, isUploading } = useUploadThing('meetingUploader', {
     onClientUploadComplete: (res) => {
-      if (res && res.length > 0) {
-        const file = res[0];
-        const fileData: UploadedFile = {
-          key: file.key,
-          ufsUrl: file.ufsUrl,
-          name: file.name,
-          size: file.size,
-          type: file.type || 'unknown',
-          uploadedAt: Date.now()
-        };
-        
-        // Use in-memory storage for Claude environment
-        const uploadedFiles = JSON.parse(sessionStorage.getItem('uploadedFiles') || '[]');
-        uploadedFiles.push(fileData);
-        sessionStorage.setItem('uploadedFiles', JSON.stringify(uploadedFiles));
-        sessionStorage.setItem('currentFile', JSON.stringify(fileData));
-        
-        // Navigate to results
-        router.push(`/results?fileKey=${file.key}&timestamp=${Date.now()}`);
+      if (res && res.length > 0 && res[0].serverData) {
+        const { fileKey } = res[0].serverData;
+        if (fileKey) {
+          // Redirect to the results page
+          router.push(`/results?fileKey=${fileKey}`);
+        } else {
+          console.error('File key not found in response:', res);
+          alert('Upload complete, but file key is missing!');
+        }
+      } else {
+        console.error('Empty or invalid response from server:', res);
+        alert('Upload failed. Please try again.');
       }
-      setIsLoading(false);
-      setUploadProgress(0);
-      setProcessingStage('');
     },
     onUploadError: (error: Error) => {
       console.error('Upload error:', error);

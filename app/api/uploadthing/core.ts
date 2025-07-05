@@ -25,27 +25,13 @@ export const ourFileRouter = {
     };
   })
   .onUploadComplete(async ({ metadata, file }) => {
-    // This code runs on the server after a successful upload
-    console.log("Upload complete for user:", metadata.userId);
-    console.log("File data:", { url: file.url, name: file.name, size: file.size });
-    
-    // Here you can:
-    // 1. Save file metadata to your database
-    // 2. Trigger any post-processing (e.g., AI analysis)
-    // 3. Send notifications
-    
-    // Return any data you want to be available to the client
-    return { 
-      success: true,
-      file: {
-        url: file.url,
-        name: file.name,
-        size: file.size,
-        key: file.key,
-        type: file.type,
-      },
-      metadata
-    };
+    console.log("Upload complete for userId:", metadata.userId);
+ 
+    console.log("file url", file.url);
+    console.log("file key", file.key);
+ 
+    // !!! Whatever is returned here is sent to the clientside `onClientUploadComplete` callback
+    return { uploadedBy: metadata.userId, fileKey: file.key };
   }),
 } satisfies FileRouter;
 

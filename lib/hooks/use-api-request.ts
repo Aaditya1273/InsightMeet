@@ -432,6 +432,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           };
 
           const response = await fetch(requestConfig.url, fetchOptions);
+          console.log('Requesting URL:', requestConfig.url);
           clearTimeout(timeoutId);
 
           // Extract response headers

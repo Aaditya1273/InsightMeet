@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server';
+import { promises as fs } from 'fs';
+import path from 'path';
 import { HfInference } from '@huggingface/inference';
 import pdf from 'pdf-parse';
 
 // Initialize Hugging Face client
 const hf = new HfInference(process.env.HF_TOKEN);
+
+// Define the structure of the analysis data
+interface AnalysisData {
+  summary: string;
+  highlights: string[];
+  keyTopics: string[];
+  sentiment: 'positive' | 'neutral' | 'negative';
+}
 
 // Define the expected structure for the AI's response
 interface AnalysisResult {
@@ -11,6 +21,57 @@ interface AnalysisResult {
   summary: string;
   keyPoints: string[];
   actionItems: Array<{ task: string; assignee?: string; dueDate?: string }>;
+}
+
+// In-memory cache to store analysis results
+const analysisCache = new Map<string, AnalysisData>();
+
+async function getAnalysis(fileKey: string): Promise<AnalysisData | null> {
+  // Check cache first
+  if (analysisCache.has(fileKey)) {
+    return analysisCache.get(fileKey) || null;
+  }
+
+  // Placeholder: In a real app, you would fetch this from a persistent store
+  // like a database or a file based on the fileKey.
+  // For this example, we'll use mock data.
+  const mockData: AnalysisData = {
+    summary: 'This is a mock summary of the document.',
+    highlights: [
+      'This is the first key highlight.',
+      'This is the second key highlight.',
+      'And a third one for good measure.',
+    ],
+    keyTopics: ['Next.js', 'React', 'TypeScript', 'AI'],
+    sentiment: 'positive',
+  };
+
+  // Store in cache
+  analysisCache.set(fileKey, mockData);
+
+  return mockData;
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const fileKey = searchParams.get('fileKey');
+
+  if (!fileKey) {
+    return NextResponse.json({ error: 'No file key provided' }, { status: 400 });
+  }
+
+  try {
+    const analysis = await getAnalysis(fileKey);
+
+    if (!analysis) {
+      return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(analysis);
+  } catch (error) {
+    console.error('Error fetching analysis:', error);
+    return NextResponse.json({ error: 'Failed to fetch analysis' }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
