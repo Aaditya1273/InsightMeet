@@ -87,18 +87,56 @@ export default function EnhancedInsightMeet() {
 
   const { startUpload, isUploading } = useUploadThing('meetingUploader', {
     onClientUploadComplete: (res) => {
-      if (res && res.length > 0 && res[0].serverData) {
-        const { fileKey } = res[0].serverData;
+      console.log('Upload complete response:', res);
+      
+      if (res && res.length > 0) {
+        const uploadedFile = res[0];
+        console.log('Uploaded file details:', uploadedFile);
+        
+        // Try multiple possible ways to get the file key
+        let fileKey = null;
+        
+        // Method 1: Check serverData for fileKey
+        if (uploadedFile.serverData?.fileKey) {
+          fileKey = uploadedFile.serverData.fileKey;
+        }
+        // Method 2: Check if key exists directly on the response
+        else if (uploadedFile.key) {
+          fileKey = uploadedFile.key;
+        }
+        // Method 3: Check if name can be used as key
+        else if (uploadedFile.name) {
+          fileKey = uploadedFile.name;
+        }
+        // Method 4: Extract from URL if available
+        else if (uploadedFile.url) {
+          // Extract file key from URL if it follows a pattern
+          const urlParts = uploadedFile.url.split('/');
+          fileKey = urlParts[urlParts.length - 1];
+        }
+        
+        console.log('Extracted file key:', fileKey);
+        
         if (fileKey) {
+          setIsLoading(false);
+          setUploadProgress(0);
+          setProcessingStage('');
+          
           // Redirect to the results page
-          router.push(`/results?fileKey=${fileKey}`);
+          router.push(`/results?fileKey=${encodeURIComponent(fileKey)}`);
         } else {
-          console.error('File key not found in response:', res);
-          alert('Upload complete, but file key is missing!');
+          console.error('No file key found in response:', uploadedFile);
+          setError('Upload completed but file key is missing. Please try again.');
+          setIsLoading(false);
+          setUploadProgress(0);
+          setProcessingStage('');
         }
       } else {
         console.error('Empty or invalid response from server:', res);
-        alert('Upload failed. Please try again.');
+        setError('Upload failed. Please try again.');
+        setIsLoading(false);
+        setUploadProgress(0);
+        setProcessingStage('');
       }
     },
     onUploadError: (error: Error) => {
@@ -134,9 +172,18 @@ export default function EnhancedInsightMeet() {
         setProcessingStage('Validating content...');
       } else if (progress < 90) {
         setProcessingStage('Optimizing for analysis...');
-      } else {
+      } else if (progress < 100) {
         setProcessingStage('Finalizing upload...');
+      } else {
+        setProcessingStage('Processing complete...');
       }
+    },
+    onUploadBegin: (name) => {
+      console.log('Upload beginning for:', name);
+      setIsLoading(true);
+      setError(null);
+      setUploadProgress(0);
+      setProcessingStage('Starting upload...');
     },
   });
 
@@ -184,6 +231,8 @@ export default function EnhancedInsightMeet() {
 
   // Enhanced file upload handler with chunking and optimization
   const handleFileUpload = useCallback(async (file: File) => {
+    console.log('Starting file upload for:', file.name);
+    
     const validation = validateFile(file);
     setFileValidation(validation);
     
@@ -195,12 +244,13 @@ export default function EnhancedInsightMeet() {
     setIsLoading(true);
     setError(null);
     setUploadProgress(0);
-    setProcessingStage('Initializing upload...');
+    setProcessingStage('Preparing upload...');
     
     uploadStartTime.current = Date.now();
     uploadedBytesRef.current = file.size;
     
     try {
+      console.log('Calling startUpload with file:', file.name);
       await startUpload([file]);
     } catch (err) {
       console.error('Upload error:', err);
