@@ -293,10 +293,10 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           requestId: requestId,
           progress: null,
           retryCount: 0,
+          fromCache: false,
           lastRequestTime: Date.now(),
           status: null,
           headers: {},
-          fromCache: false,
           loaded: 0,
           total: 0,
         };
@@ -335,7 +335,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           performanceMetrics.cacheHits++;
           
           const cacheResponse: ApiResponse<TLocal> = {
-            data: cachedData.data as TLocal,
+            data: cachedData.data as unknown as TLocal,
             error: null,
             status: cachedData.status,
             headers: cachedData.headers,
@@ -345,7 +345,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           };
 
           safeSetState(prev => ({
-            data: cachedData.data as T,
+            data: cachedData.data as unknown as T,
             status: cachedData.status,
             headers: cachedData.headers,
             fromCache: true,
@@ -359,7 +359,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
             total: 0
           }));
 
-          onSuccess?.(cachedData.data as TLocal, new Response());
+          onSuccess?.(cachedData.data as unknown as TLocal, new Response());
 
           // Background refresh for stale-while-revalidate
           if (cacheStrategy === 'stale-while-revalidate' && backgroundRefresh) {
