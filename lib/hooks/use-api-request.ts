@@ -251,7 +251,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
   // Main request function
   const request = useCallback(
-    async <T = any>(url: string, options: RequestOptions<T> = {}): Promise<ApiResponse<T>> => {
+    async <TLocal = any>(url: string, options: RequestOptions<TLocal> = {}): Promise<ApiResponse<TLocal>> => {
       const startTime = Date.now();
       const requestId = generateRequestId();
       requestIdRef.current = requestId;
@@ -329,13 +329,13 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
       
       // Check cache first for GET requests
       if (method === 'GET' && cacheStrategy !== 'no-cache') {
-        const cachedData = getCachedData<T>(cacheKey);
+        const cachedData = getCachedData<TLocal>(cacheKey);
         
         if (cachedData) {
           performanceMetrics.cacheHits++;
           
-          const cacheResponse: ApiResponse<T> = {
-            data: cachedData.data as T,
+          const cacheResponse: ApiResponse<TLocal> = {
+            data: cachedData.data as TLocal,
             error: null,
             status: cachedData.status,
             headers: cachedData.headers,
@@ -359,7 +359,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
             total: 0
           }));
 
-          onSuccess?.(cachedData.data as T, new Response());
+          onSuccess?.(cachedData.data as TLocal, new Response());
 
           // Background refresh for stale-while-revalidate
           if (cacheStrategy === 'stale-while-revalidate' && backgroundRefresh) {
@@ -377,7 +377,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
       // Deduplication
       const dedupeKey = `${method}_${requestUrl}_${JSON.stringify(body)}`;
       if (dedupe && pendingRequests.has(dedupeKey)) {
-        return pendingRequests.get(dedupeKey)! as Promise<ApiResponse<T>>;
+        return pendingRequests.get(dedupeKey)! as Promise<ApiResponse<TLocal>>;
       }
 
       // Cancel any ongoing request
@@ -418,7 +418,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
         requestConfig = interceptor(requestConfig);
       }
 
-      const executeRequest = async (): Promise<ApiResponse<T>> => {
+      const executeRequest = async (): Promise<ApiResponse<TLocal>> => {
         const timeoutId = setTimeout(() => {
           abortControllerRef.current?.abort();
         }, timeout);
@@ -505,7 +505,7 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           performanceMetrics.averageResponseTime = 
             (performanceMetrics.averageResponseTime * (performanceMetrics.totalRequests - 1) + responseTime) / performanceMetrics.totalRequests;
 
-          const apiResponse: ApiResponse<T> = {
+          const apiResponse: ApiResponse<TLocal> = {
             data: finalData,
             error: null,
             status: response.status,
