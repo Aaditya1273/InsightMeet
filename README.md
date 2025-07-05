@@ -2,7 +2,7 @@
 
 InsightMeet is an AI-powered meeting assistant that helps you transcribe, summarize, and extract action items from your meetings. It's built with Next.js and uses local AI models for processing.
 
-## Features
+## Features:
 
 - 📝 Upload meeting audio or text transcripts
 - 🎙️ Automatic speech-to-text transcription
@@ -13,9 +13,9 @@ InsightMeet is an AI-powered meeting assistant that helps you transcribe, summar
 - 📅 Add to calendar (ICS format)
 - 🔒 Privacy-focused (all processing happens locally)
 
-## Getting Started
+## Getting Started:
 
-### Prerequisites
+### Prerequisites:
 
 - Node.js 18.0.0 or later
 - npm or yarn

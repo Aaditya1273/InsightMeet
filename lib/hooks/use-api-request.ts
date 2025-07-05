@@ -286,9 +286,8 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
 
       // Apply optimistic updates
       if (optimistic && optimisticData) {
-        safeSetState(prev => ({
-          ...prev,
-          data: optimisticData as T,
+        const nextState: Partial<RequestState<T>> = {
+          data: optimisticData as T | null,
           isLoading: true,
           error: null,
           requestId: requestId,
@@ -300,7 +299,17 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           fromCache: false,
           loaded: 0,
           total: 0,
-        }));
+        };
+        
+        const updateFn = (prev: RequestState<T>): Partial<RequestState<T>> => {
+          const result: Partial<RequestState<T>> = {
+            ...prev,
+            ...nextState
+          };
+          return result;
+        };
+        
+        safeSetState(updateFn);
       }
 
       // Build URL with query parameters
@@ -336,7 +345,6 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           };
 
           safeSetState(prev => ({
-            ...prev,
             data: cachedData.data as T,
             status: cachedData.status,
             headers: cachedData.headers,
@@ -345,10 +353,10 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
             isLoading: false,
             error: null,
             lastRequestTime: Date.now(),
+            retryCount: prev.retryCount,
             progress: null,
-            retryCount: 0,
             loaded: 0,
-            total: 0,
+            total: 0
           }));
 
           onSuccess?.(cachedData.data as T, new Response());
