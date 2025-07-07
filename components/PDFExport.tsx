@@ -41,6 +41,8 @@ interface PDFSection {
   type: 'text' | 'list' | 'table' | 'image' | 'code' | 'quote';
   styling?: Partial<PDFStyling>;
   pageBreak?: boolean;
+  columns?: Array<{header: string, dataKey: string}>;
+  rows?: Array<Record<string, string | number>>;
 }
 
 interface PDFHeader {
@@ -190,7 +192,7 @@ export function PDFExport({
       
       // Dynamically import jsPDF with advanced plugins
       const { jsPDF } = await import('jspdf');
-      await import('jspdf-autotable');
+      const { autoTable } = await import('jspdf-autotable');
       
       updateProgress(20);
 
@@ -229,7 +231,8 @@ export function PDFExport({
       updateProgress(40);
 
       // Apply security if enabled
-      if (security.enabled) {
+      // Note: jsPDF does not support encryption natively, so this section is commented out
+      /* if (security.enabled) {
         doc.encrypt(
           security.userPassword || '',
           security.ownerPassword || 'owner',
@@ -240,7 +243,7 @@ export function PDFExport({
             annotating: false
           }
         );
-      }
+      } */
 
       updateProgress(50);
 
@@ -433,6 +436,27 @@ export function PDFExport({
               doc.text(codeLines, margins.left + 5, yPosition);
               doc.setFont('helvetica');
               yPosition += codeLines.length * 12 * 0.5 + 10;
+              break;
+
+            case 'table':
+              autoTable(doc, {
+                columns: section.columns,
+                body: section.rows,
+                startY: yPosition,
+                theme: 'grid',
+                styles: {
+                  fontSize: finalStyling.fontSize,
+                  cellPadding: 5,
+                  overflow: 'linebreak',
+                  valign: 'middle'
+                },
+                headStyles: {
+                  fillColor: finalStyling.primaryColor,
+                  textColor: 255,
+                  fontSize: finalStyling.fontSize + 1
+                }
+              });
+              yPosition += autoTable.previous.finalY + 10;
               break;
 
             default:
