@@ -363,6 +363,9 @@ type AnalyticsData = {
   total: number;
   completed: number;
   inProgress: number;
+  overdue: number;
+  avgTimeToComplete: number;
+  completionRate: number;
 };
 
 export function EnhancedSummaryView({
@@ -611,7 +614,7 @@ export function EnhancedSummaryView({
   const [likes, setLikes] = useState(0);
   const [shares, setShares] = useState(0);
   const [bookmarks, setBookmarks] = useState(0);
-  const [summaryAnalytics, setSummaryAnalytics] = useState<AnalyticsData>({ total: 0, completed: 0, inProgress: 0 });
+  const [summaryAnalytics, setSummaryAnalytics] = useState<AnalyticsData>({ total: 0, completed: 0, inProgress: 0, overdue: 0, avgTimeToComplete: 0, completionRate: 0 });
   const [performance, setPerformance] = useState({});
   const [security, setSecurity] = useState({});
   const [compliance, setCompliance] = useState({});
@@ -770,7 +773,7 @@ export function EnhancedSummaryView({
     const completed = filteredActionItems.filter(item => item.completed).length;
     const inProgress = filteredActionItems.filter(item => !item.completed).length;
     
-    return { total, completed, inProgress };
+    return { total, completed, inProgress, overdue: 0, avgTimeToComplete: 0, completionRate: (completed / total) * 100 };
   }, [filteredActionItems]) as AnalyticsData;
 
   // Advanced Performance Optimizations
