@@ -461,8 +461,6 @@ export function UploadInput({
             uploadStartTime.current = Date.now();
             console.log("Enhanced upload started:", fileName);
           }}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
           disabled={!canUploadMore}
           className={`
             relative min-h-[200px] border-2 border-dashed rounded-xl p-8 text-center cursor-pointer

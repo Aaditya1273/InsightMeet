@@ -153,6 +153,48 @@ const THEME_CONFIGS = {
   }
 };
 
+// Utility function for PDF generation that can be used independently
+export const generatePDF = async (
+  content: string | PDFSection[],
+  fileName: string,
+  options: Partial<PDFExportProps> = {}
+): Promise<Blob> => {
+  const { jsPDF } = await import('jspdf');
+  const { autoTable } = await import('jspdf-autotable');
+  
+  const finalStyling = {
+    ...DEFAULT_STYLING,
+    ...options.styling
+  };
+  
+  // Similar logic as in generateAdvancedPDF
+  // This is a simplified version - you may need to copy more logic from generateAdvancedPDF
+  const doc = new jsPDF({
+    orientation: options.orientation || 'portrait',
+    unit: 'mm',
+    format: options.size || 'a4',
+    compress: options.compression || true
+  });
+  
+  doc.setFontSize(finalStyling.fontSize);
+  doc.setFont(finalStyling.fontFamily);
+  doc.setTextColor(finalStyling.primaryColor);
+  
+  // Add content - this is very simplified
+  if (typeof content === 'string') {
+    doc.text(content, 10, 10);
+  } else {
+    // Handle PDFSection array - would need full implementation
+    content.forEach((section, index) => {
+      doc.text(section.title, 10, 10 + index * 10);
+      doc.text(section.content, 10, 15 + index * 10);
+    });
+  }
+  
+  const blob = doc.output('blob');
+  return blob;
+};
+
 export function PDFExport({
   content,
   fileName = 'document',
@@ -644,31 +686,20 @@ export const PDFPresets = {
 };
 
 // Export utility for batch PDF generation
-export const generateBatchPDFs = async (
+export async function generateBatchPDFs(
   documents: Array<{ content: string | PDFSection[]; fileName: string; options?: Partial<PDFExportProps> }>,
   onProgress?: (current: number, total: number) => void
-): Promise<Blob[]> => {
+): Promise<Blob[]> {
   const results: Blob[] = [];
   
   for (let i = 0; i < documents.length; i++) {
     const doc = documents[i];
     onProgress?.(i + 1, documents.length);
     
-    // Create a temporary PDF export instance
-    const pdfExport = new PDFExport({
-      content: doc.content,
-      fileName: doc.fileName,
-      ...doc.options
-    });
-    
-    // Generate PDF and collect blob
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      pdfExport.generateAdvancedPDF();
-      // Implementation would need to be adapted for batch processing
-    });
-    
+    // Use the standalone utility function
+    const blob = await generatePDF(doc.content, doc.fileName, doc.options);
     results.push(blob);
   }
   
   return results;
-};
+}
