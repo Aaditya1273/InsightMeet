@@ -3,10 +3,10 @@
 // Add this to declare the webkitSpeechRecognition property on the window object
 declare global {
     interface Window {
-        webkitSpeechRecognition: any;
+        webkitSpeechRecognition: new () => SpeechRecognition;
+        SpeechRecognition: new () => SpeechRecognition;
     }
 }
-
 
 import React, { useState, useEffect, useRef } from 'react';
 
