@@ -634,7 +634,7 @@ export function EnhancedSummaryView({
   const [customizations, setCustomizations] = useState({});
   const [personalizations, setPersonalizations] = useState({});
   const [automations, setAutomations] = useState([]);
-  const [aiInsights, setAiInsights] = useState([]);
+  const [aiInsights, setAiInsights] = useState<string[]>([]);
   const [mlPredictions, setMlPredictions] = useState([]);
   const [nlpAnalysis, setNlpAnalysis] = useState({});
   const [cvRecognition, setCvRecognition] = useState([]);

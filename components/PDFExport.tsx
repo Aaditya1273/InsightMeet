@@ -160,7 +160,7 @@ export const generatePDF = async (
   options: Partial<PDFExportProps> = {}
 ): Promise<Blob> => {
   const { jsPDF } = await import('jspdf');
-  const { autoTable } = await import('jspdf-autotable');
+  const autoTable = await import('jspdf-autotable');
   
   const finalStyling = {
     ...DEFAULT_STYLING,
@@ -234,7 +234,7 @@ export function PDFExport({
       
       // Dynamically import jsPDF with advanced plugins
       const { jsPDF } = await import('jspdf');
-      const { autoTable } = await import('jspdf-autotable');
+      const autoTable = await import('jspdf-autotable');
       
       updateProgress(20);
 
@@ -453,13 +453,13 @@ export function PDFExport({
             case 'quote':
               doc.setFontSize(finalStyling.fontSize - 1);
               doc.setTextColor(finalStyling.secondaryColor);
-              doc.setFont(undefined, 'italic');
+              doc.setFont('italic');
               const quoteLines = doc.splitTextToSize(
                 `"${section.content}"`,
                 pageWidth - margins.left - margins.right - 20
               );
               doc.text(quoteLines, margins.left + 10, yPosition);
-              doc.setFont(undefined, 'normal');
+              doc.setFont('normal');
               yPosition += quoteLines.length * finalStyling.fontSize * 0.5;
               break;
 
@@ -481,8 +481,8 @@ export function PDFExport({
               break;
 
             case 'table':
-              autoTable(doc, {
-                columns: section.columns,
+              autoTable.default(doc, {
+                head: section.columns ? [section.columns.map(c => c.header)] : [],
                 body: section.rows,
                 startY: yPosition,
                 theme: 'grid',
@@ -498,7 +498,7 @@ export function PDFExport({
                   fontSize: finalStyling.fontSize + 1
                 }
               });
-              yPosition += autoTable.previous.finalY + 10;
+              yPosition = (doc as any).lastAutoTable.finalY + 10;
               break;
 
             default:
