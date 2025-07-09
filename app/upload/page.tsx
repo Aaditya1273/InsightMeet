@@ -146,7 +146,6 @@ export default function EpicUploadPage() {
                     accept=".pdf"
                     maxSize={50 * 1024 * 1024} // 50MB
                     allowMultiple={false}
-                    isButton={true}
                   />
                 </div>
               </div>

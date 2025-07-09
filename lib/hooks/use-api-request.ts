@@ -364,7 +364,10 @@ export function useApiRequest<T = any>(globalConfig: Partial<RequestOptions<T>> 
           // Background refresh for stale-while-revalidate
           if (cacheStrategy === 'stale-while-revalidate' && backgroundRefresh) {
             setTimeout(() => {
-              request(url, { ...mergedOptions, cacheStrategy: 'network-first' });
+              request(
+                url,
+                { ...mergedOptions, cacheStrategy: 'network-first' } as RequestOptions<TLocal>
+              );
             }, 0);
           }
 

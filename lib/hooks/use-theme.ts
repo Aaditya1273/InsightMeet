@@ -313,8 +313,8 @@ export class ThemeManager {
   }
 
   private setupListeners(): void {
-    window.addEventListener('themechange', (e: CustomEvent) => {
-      this.currentTheme = e.detail.resolvedTheme;
+    window.addEventListener('themechange', (e: Event) => {
+      this.currentTheme = (e as CustomEvent).detail.resolvedTheme;
       this.notifyListeners();
     });
   }

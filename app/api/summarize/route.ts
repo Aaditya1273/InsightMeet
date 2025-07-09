@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { HfInference } from '@huggingface/inference';
 import pdf from 'pdf-parse';
+import { Buffer } from 'buffer';
 
 // Initialize Hugging Face client
 const hf = new HfInference(process.env.HF_TOKEN);
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
     const fileBuffer = await response.arrayBuffer();
 
     // 2. Extract text from the PDF
-    const pdfData = await pdf(fileBuffer);
+    const pdfData = await pdf(Buffer.from(fileBuffer));
     const textContent = pdfData.text;
 
     if (!textContent) {
