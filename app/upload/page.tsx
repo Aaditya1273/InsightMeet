@@ -75,8 +75,9 @@ export default function EpicUploadPage() {
   ];
 
   const getProgressColor = () => {
-    if (progress?.percentage < 30) return 'from-blue-400 to-purple-600';
-    if (progress?.percentage < 70) return 'from-purple-400 to-pink-600';
+    const percentage = progress?.percentage ?? 0;
+    if (percentage < 30) return 'from-blue-400 to-purple-600';
+    if (percentage < 70) return 'from-purple-400 to-pink-600';
     return 'from-pink-400 to-red-600';
   };
 
