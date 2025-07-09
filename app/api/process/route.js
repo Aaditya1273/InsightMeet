@@ -1,583 +1,572 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
 
-/* ===== REVOLUTIONARY CSS VARIABLES ===== */
-:root {
-  /* Dynamic Color System */
-  --primary-hue: 260;
-  --secondary-hue: 320;
-  --accent-hue: 180;
+// Rate limiting store (in production, use Redis or similar)
+const rateLimitStore = new Map();
+
+// Configuration
+const CONFIG = {
+  rateLimit: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 100,
+  },
+  cors: {
+    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['*'],
+    allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  },
+  cache: {
+    maxAge: 300, // 5 minutes
+    staleWhileRevalidate: 60,
+  },
+  pagination: {
+    defaultLimit: 20,
+    maxLimit: 100,
+  },
+  security: {
+    requireApiKey: process.env.REQUIRE_API_KEY === 'true',
+    apiKey: process.env.API_KEY,
+  },
+};
+
+// Utility functions
+const createResponse = (data, status = 200, headers = {}) => {
+  return NextResponse.json(data, { 
+    status, 
+    headers: {
+      'Cache-Control': `public, max-age=${CONFIG.cache.maxAge}, stale-while-revalidate=${CONFIG.cache.staleWhileRevalidate}`,
+      'X-Powered-By': 'Enhanced-API-v1.0',
+      'X-Response-Time': Date.now().toString(),
+      ...headers,
+    }
+  });
+};
+
+const createErrorResponse = (message, status = 500, code = 'INTERNAL_ERROR') => {
+  return NextResponse.json({
+    error: true,
+    message,
+    code,
+    timestamp: new Date().toISOString(),
+  }, { status });
+};
+
+// Rate limiting middleware
+const rateLimit = (clientId) => {
+  const now = Date.now();
+  const windowStart = now - CONFIG.rateLimit.windowMs;
   
-  /* Neon Palette */
-  --neon-blue: #00d4ff;
-  --neon-purple: #8b5cf6;
-  --neon-pink: #f472b6;
-  --neon-green: #10b981;
-  --neon-orange: #fb923c;
+  if (!rateLimitStore.has(clientId)) {
+    rateLimitStore.set(clientId, []);
+  }
   
-  /* Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.1);
-  --glass-border: rgba(255, 255, 255, 0.2);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  const requests = rateLimitStore.get(clientId).filter(time => time > windowStart);
   
-  /* Dynamic Gradients */
-  --gradient-cosmic: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --gradient-sunset: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  --gradient-ocean: linear-gradient(135deg, #667db6 0%, #0082c8 35%, #0082c8 100%);
-  --gradient-aurora: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%);
-  --gradient-cyberpunk: linear-gradient(135deg, #ff00ff 0%, #00ffff 50%, #ffff00 100%);
+  if (requests.length >= CONFIG.rateLimit.maxRequests) {
+    return false;
+  }
   
-  /* Advanced Shadows */
-  --shadow-brutal: 8px 8px 0px #000;
-  --shadow-neon: 0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor;
-  --shadow-floating: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  --shadow-inner-glow: inset 0 0 20px rgba(255, 255, 255, 0.2);
+  requests.push(now);
+  rateLimitStore.set(clientId, requests);
   
-  /* Typography Scale */
-  --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  // Clean up old entries
+  if (rateLimitStore.size > 1000) {
+    const oldestAllowed = now - CONFIG.rateLimit.windowMs;
+    for (const [key, times] of rateLimitStore.entries()) {
+      const validTimes = times.filter(time => time > oldestAllowed);
+      if (validTimes.length === 0) {
+        rateLimitStore.delete(key);
+      } else {
+        rateLimitStore.set(key, validTimes);
+      }
+    }
+  }
   
-  /* Animation Curves */
-  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  --ease-back: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+  return true;
+};
+
+// Authentication middleware
+const authenticate = (request) => {
+  if (!CONFIG.security.requireApiKey) return true;
   
-  /* Responsive Breakpoints */
-  --mobile: 768px;
-  --tablet: 1024px;
-  --desktop: 1280px;
+  const apiKey = request.headers.get('X-API-Key') || 
+                 request.headers.get('Authorization')?.replace('Bearer ', '');
+  
+  return apiKey === CONFIG.security.apiKey;
+};
+
+// CORS middleware
+const handleCors = (request) => {
+  const origin = request.headers.get('origin');
+  const allowedOrigins = CONFIG.cors.allowedOrigins;
+  
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    return {
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Methods': CONFIG.cors.allowedMethods.join(', '),
+      'Access-Control-Allow-Headers': CONFIG.cors.allowedHeaders.join(', '),
+      'Access-Control-Max-Age': '86400',
+    };
+  }
+  
+  return null;
+};
+
+// Pagination utility
+const getPaginationParams = (searchParams) => {
+  const page = Math.max(1, parseInt(searchParams.get('page')) || 1);
+  const limit = Math.min(
+    CONFIG.pagination.maxLimit,
+    Math.max(1, parseInt(searchParams.get('limit')) || CONFIG.pagination.defaultLimit)
+  );
+  const offset = (page - 1) * limit;
+  
+  return { page, limit, offset };
+};
+
+// Input validation
+const validateInput = (data, schema) => {
+  const errors = [];
+  
+  for (const [field, rules] of Object.entries(schema)) {
+    const value = data[field];
+    
+    if (rules.required && (value === undefined || value === null || value === '')) {
+      errors.push(`${field} is required`);
+      continue;
+    }
+    
+    if (value !== undefined && value !== null) {
+      if (rules.type && typeof value !== rules.type) {
+        errors.push(`${field} must be of type ${rules.type}`);
+      }
+      
+      if (rules.minLength && value.length < rules.minLength) {
+        errors.push(`${field} must be at least ${rules.minLength} characters long`);
+      }
+      
+      if (rules.maxLength && value.length > rules.maxLength) {
+        errors.push(`${field} must be no more than ${rules.maxLength} characters long`);
+      }
+      
+      if (rules.pattern && !rules.pattern.test(value)) {
+        errors.push(`${field} format is invalid`);
+      }
+    }
+  }
+  
+  return errors;
+};
+
+// Mock database operations (replace with real database)
+const mockDatabase = {
+  users: [
+    { id: 1, name: 'John Doe', email: 'john@example.com', createdAt: '2024-01-01T00:00:00Z' },
+    { id: 2, name: 'Jane Smith', email: 'jane@example.com', createdAt: '2024-01-02T00:00:00Z' },
+  ],
+  
+  async find(filters = {}, pagination = {}) {
+    let result = [...this.users];
+    
+    // Apply filters
+    if (filters.name) {
+      result = result.filter(user => 
+        user.name.toLowerCase().includes(filters.name.toLowerCase())
+      );
+    }
+    
+    if (filters.email) {
+      result = result.filter(user => 
+        user.email.toLowerCase().includes(filters.email.toLowerCase())
+      );
+    }
+    
+    // Apply pagination
+    const total = result.length;
+    const { offset, limit } = pagination;
+    
+    if (offset !== undefined && limit !== undefined) {
+      result = result.slice(offset, offset + limit);
+    }
+    
+    return {
+      data: result,
+      pagination: {
+        total,
+        page: Math.floor(offset / limit) + 1,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+  
+  async findById(id) {
+    return this.users.find(user => user.id === parseInt(id));
+  },
+  
+  async create(data) {
+    const newUser = {
+      id: Math.max(...this.users.map(u => u.id), 0) + 1,
+      ...data,
+      createdAt: new Date().toISOString(),
+    };
+    this.users.push(newUser);
+    return newUser;
+  },
+  
+  async update(id, data) {
+    const index = this.users.findIndex(user => user.id === parseInt(id));
+    if (index === -1) return null;
+    
+    this.users[index] = { ...this.users[index], ...data, updatedAt: new Date().toISOString() };
+    return this.users[index];
+  },
+  
+  async delete(id) {
+    const index = this.users.findIndex(user => user.id === parseInt(id));
+    if (index === -1) return false;
+    
+    this.users.splice(index, 1);
+    return true;
+  },
+};
+
+// OPTIONS handler for CORS preflight
+export async function OPTIONS(request) {
+  const corsHeaders = handleCors(request);
+  
+  if (!corsHeaders) {
+    return createErrorResponse('Origin not allowed', 403, 'CORS_ERROR');
+  }
+  
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
 }
 
-/* ===== DARK MODE SYSTEM ===== */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --glass-bg: rgba(0, 0, 0, 0.2);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  }
-}
-
-/* ===== BASE STYLES ===== */
-* {
-  box-sizing: border-box;
-}
-
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-  overflow-x: hidden;
-}
-
-body {
-  font-family: var(--font-display);
-  line-height: 1.6;
-  color: rgb(15, 23, 42);
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  overflow-x: hidden;
-  transition: all 0.3s ease;
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    color: rgb(248, 250, 252);
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  }
-}
-
-/* ===== REVOLUTIONARY BUTTON SYSTEM ===== */
-@layer components {
-  .btn {
-    @apply relative inline-flex items-center justify-center px-6 py-3 font-semibold text-sm transition-all duration-300 ease-out;
-    border-radius: 12px;
-    cursor: pointer;
-    user-select: none;
-    transform-style: preserve-3d;
-    perspective: 1000px;
-    overflow: hidden;
+// GET handler - List resources with filtering, pagination, and search
+export async function GET(request) {
+  try {
+    const startTime = Date.now();
     
-    /* Base state */
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-    
-    /* Hover effects */
-    &:hover {
-      transform: translateY(-2px) scale(1.02);
+    // CORS handling
+    const corsHeaders = handleCors(request);
+    if (!corsHeaders) {
+      return createErrorResponse('Origin not allowed', 403, 'CORS_ERROR');
     }
     
-    &:active {
-      transform: translateY(0) scale(0.98);
+    // Authentication
+    if (!authenticate(request)) {
+      return createErrorResponse('Unauthorized', 401, 'AUTH_ERROR');
     }
     
-    /* Ripple effect */
-    &::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 0;
-      height: 0;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.3);
-      transform: translate(-50%, -50%);
-      transition: all 0.6s ease;
-      z-index: 0;
+    // Rate limiting
+    const clientId = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    if (!rateLimit(clientId)) {
+      return createErrorResponse('Rate limit exceeded', 429, 'RATE_LIMIT_ERROR');
     }
     
-    &:active::before {
-      width: 300px;
-      height: 300px;
-    }
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const pagination = getPaginationParams(searchParams);
     
-    /* Content positioning */
-    & > * {
-      position: relative;
-      z-index: 1;
-    }
-  }
-  
-  /* PRIMARY BUTTON - Cosmic Energy */
-  .btn-primary {
-    background: var(--gradient-cosmic);
-    color: white;
-    border: none;
-    position: relative;
+    // Build filters
+    const filters = {
+      name: searchParams.get('name'),
+      email: searchParams.get('email'),
+    };
     
-    &::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: var(--gradient-aurora);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      border-radius: inherit;
-    }
+    // Remove null/undefined filters
+    Object.keys(filters).forEach(key => {
+      if (filters[key] === null || filters[key] === undefined) {
+        delete filters[key];
+      }
+    });
     
-    &:hover::after {
-      opacity: 1;
-    }
+    // Fetch data
+    const result = await mockDatabase.find(filters, pagination);
     
-    &:hover {
-      box-shadow: var(--shadow-neon), var(--shadow-floating);
-      transform: translateY(-4px) scale(1.05);
-    }
-  }
-  
-  /* SECONDARY BUTTON - Glassmorphism Pro */
-  .btn-secondary {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    border: 2px solid var(--glass-border);
-    color: rgb(51, 65, 85);
+    // Calculate response time
+    const responseTime = Date.now() - startTime;
     
-    &:hover {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: var(--neon-blue);
-      box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
-      color: var(--neon-blue);
-    }
-  }
-  
-  /* NEON BUTTON - Cyberpunk Vibes */
-  .btn-neon {
-    background: transparent;
-    border: 2px solid var(--neon-purple);
-    color: var(--neon-purple);
-    position: relative;
+    return createResponse({
+      success: true,
+      data: result.data,
+      pagination: result.pagination,
+      filters: Object.keys(filters).length > 0 ? filters : undefined,
+      metadata: {
+        responseTime: `${responseTime}ms`,
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+      },
+    }, 200, corsHeaders);
     
-    &::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: var(--neon-purple);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      border-radius: inherit;
-    }
-    
-    &:hover {
-      color: white;
-      text-shadow: 0 0 10px white;
-      box-shadow: 
-        0 0 20px var(--neon-purple),
-        0 0 40px var(--neon-purple),
-        0 0 80px var(--neon-purple);
-    }
-    
-    &:hover::before {
-      opacity: 1;
-    }
-  }
-  
-  /* FLOATING BUTTON - Anti-gravity */
-  .btn-floating {
-    background: var(--gradient-sunset);
-    border: none;
-    color: white;
-    border-radius: 50px;
-    animation: float 3s ease-in-out infinite;
-    
-    &:hover {
-      animation-play-state: paused;
-      transform: translateY(-8px) scale(1.1);
-      box-shadow: var(--shadow-floating);
-    }
-  }
-  
-  /* BRUTAL BUTTON - Bold Statement */
-  .btn-brutal {
-    background: var(--neon-orange);
-    border: 3px solid #000;
-    color: #000;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    box-shadow: var(--shadow-brutal);
-    
-    &:hover {
-      transform: translate(-4px, -4px);
-      box-shadow: 12px 12px 0px #000;
-    }
-    
-    &:active {
-      transform: translate(0, 0);
-      box-shadow: 4px 4px 0px #000;
-    }
-  }
-  
-  /* ===== NEXT-LEVEL INPUT SYSTEM ===== */
-  .input {
-    @apply relative w-full px-4 py-3 text-sm transition-all duration-300;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    border: 2px solid transparent;
-    border-radius: 12px;
-    outline: none;
-    
-    /* Gradient border effect */
-    background-clip: padding-box;
-    
-    &::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      padding: 2px;
-      background: var(--gradient-cosmic);
-      border-radius: inherit;
-      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      mask-composite: xor;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    
-    &:focus {
-      border-color: var(--neon-blue);
-      box-shadow: 
-        0 0 0 3px rgba(0, 212, 255, 0.1),
-        0 0 20px rgba(0, 212, 255, 0.2);
-      transform: scale(1.02);
-    }
-    
-    &:focus::before {
-      opacity: 1;
-    }
-    
-    /* Floating label effect */
-    &:not(:placeholder-shown) + .input-label,
-    &:focus + .input-label {
-      transform: translateY(-25px) scale(0.8);
-      color: var(--neon-blue);
-    }
-  }
-  
-  .input-label {
-    position: absolute;
-    left: 16px;
-    top: 12px;
-    color: rgb(107, 114, 128);
-    pointer-events: none;
-    transition: all 0.3s var(--ease-bounce);
-    transform-origin: left top;
-  }
-  
-  .input-container {
-    position: relative;
-    margin-bottom: 24px;
-  }
-  
-  /* ===== REVOLUTIONARY CARD SYSTEM ===== */
-  .card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    border-radius: 24px;
-    padding: 32px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.4s var(--ease-elastic);
-    
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.5s ease;
-    }
-    
-    &:hover {
-      transform: translateY(-8px) rotateX(5deg);
-      box-shadow: var(--shadow-floating);
-    }
-    
-    &:hover::before {
-      left: 100%;
-    }
-  }
-  
-  /* NEON CARD - Glowing Edges */
-  .card-neon {
-    @apply card;
-    border: 2px solid var(--neon-purple);
-    
-    &:hover {
-      box-shadow: 
-        0 0 30px rgba(139, 92, 246, 0.3),
-        var(--shadow-floating);
-    }
-  }
-  
-  /* FLOATING CARD - Levitation Effect */
-  .card-floating {
-    @apply card;
-    animation: float 4s ease-in-out infinite;
-    
-    &:hover {
-      animation-play-state: paused;
-    }
-  }
-  
-  /* HOLOGRAPHIC CARD - Future Tech */
-  .card-holographic {
-    @apply card;
-    background: linear-gradient(45deg, 
-      rgba(255, 0, 255, 0.1) 0%,
-      rgba(0, 255, 255, 0.1) 25%,
-      rgba(255, 255, 0, 0.1) 50%,
-      rgba(255, 0, 255, 0.1) 75%,
-      rgba(0, 255, 255, 0.1) 100%);
-    background-size: 200% 200%;
-    animation: holographic 3s ease-in-out infinite;
-    
-    &:hover {
-      animation-duration: 1s;
-    }
-  }
-  
-  /* ===== ADVANCED UTILITY CLASSES ===== */
-  
-  /* Text Effects */
-  .text-glow {
-    text-shadow: 0 0 10px currentColor;
-  }
-  
-  .text-neon {
-    color: var(--neon-blue);
-    text-shadow: 
-      0 0 5px var(--neon-blue),
-      0 0 10px var(--neon-blue),
-      0 0 20px var(--neon-blue);
-  }
-  
-  .text-gradient {
-    background: var(--gradient-cosmic);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  
-  /* Morphism Effects */
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-  }
-  
-  .neumorphism {
-    background: #e0e5ec;
-    box-shadow: 
-      20px 20px 60px #bebebe,
-      -20px -20px 60px #ffffff;
-  }
-  
-  /* Interactive Effects */
-  .hover-tilt {
-    transition: transform 0.3s ease;
-  }
-  
-  .hover-tilt:hover {
-    transform: perspective(1000px) rotateX(10deg) rotateY(10deg);
-  }
-  
-  .magnetic {
-    transition: transform 0.1s ease;
-  }
-  
-  /* Scroll Reveal Effects */
-  .reveal {
-    opacity: 0;
-    transform: translateY(50px);
-    transition: all 0.6s var(--ease-bounce);
-  }
-  
-  .reveal.active {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  
-  /* Loading Effects */
-  .loading {
-    position: relative;
-    color: transparent;
-  }
-  
-  .loading::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--gradient-cosmic);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: inherit;
+  } catch (error) {
+    console.error('GET Error:', error);
+    return createErrorResponse('Internal server error', 500, 'GET_ERROR');
   }
 }
 
-/* ===== ADVANCED ANIMATIONS ===== */
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
-}
-
-@keyframes holographic {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes pulse-neon {
-  0%, 100% {
-    text-shadow: 
-      0 0 5px currentColor,
-      0 0 10px currentColor,
-      0 0 20px currentColor;
-  }
-  50% {
-    text-shadow: 
-      0 0 2px currentColor,
-      0 0 5px currentColor,
-      0 0 10px currentColor;
-  }
-}
-
-@keyframes rotate-gradient {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* ===== RESPONSIVE DESIGN ===== */
-@media (max-width: 768px) {
-  .btn {
-    @apply px-4 py-2 text-xs;
-  }
-  
-  .card {
-    padding: 20px;
-    border-radius: 16px;
-  }
-  
-  .input {
-    @apply px-3 py-2 text-sm;
-  }
-}
-
-/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+// POST handler - Create new resource
+export async function POST(request) {
+  try {
+    // CORS handling
+    const corsHeaders = handleCors(request);
+    if (!corsHeaders) {
+      return createErrorResponse('Origin not allowed', 403, 'CORS_ERROR');
+    }
+    
+    // Authentication
+    if (!authenticate(request)) {
+      return createErrorResponse('Unauthorized', 401, 'AUTH_ERROR');
+    }
+    
+    // Rate limiting
+    const clientId = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    if (!rateLimit(clientId)) {
+      return createErrorResponse('Rate limit exceeded', 429, 'RATE_LIMIT_ERROR');
+    }
+    
+    // Parse and validate request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return createErrorResponse('Invalid JSON', 400, 'INVALID_JSON');
+    }
+    
+    // Validation schema
+    const schema = {
+      name: { required: true, type: 'string', minLength: 2, maxLength: 50 },
+      email: { 
+        required: true, 
+        type: 'string', 
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ 
+      },
+    };
+    
+    const validationErrors = validateInput(body, schema);
+    if (validationErrors.length > 0) {
+      return createErrorResponse('Validation failed', 400, 'VALIDATION_ERROR', {
+        errors: validationErrors,
+      });
+    }
+    
+    // Create resource
+    const newResource = await mockDatabase.create(body);
+    
+    return createResponse({
+      success: true,
+      data: newResource,
+      message: 'Resource created successfully',
+    }, 201, corsHeaders);
+    
+  } catch (error) {
+    console.error('POST Error:', error);
+    return createErrorResponse('Internal server error', 500, 'POST_ERROR');
   }
 }
 
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .btn {
-    border-width: 2px;
+// PUT handler - Update resource
+export async function PUT(request) {
+  try {
+    // CORS handling
+    const corsHeaders = handleCors(request);
+    if (!corsHeaders) {
+      return createErrorResponse('Origin not allowed', 403, 'CORS_ERROR');
+    }
+    
+    // Authentication
+    if (!authenticate(request)) {
+      return createErrorResponse('Unauthorized', 401, 'AUTH_ERROR');
+    }
+    
+    // Rate limiting
+    const clientId = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    if (!rateLimit(clientId)) {
+      return createErrorResponse('Rate limit exceeded', 429, 'RATE_LIMIT_ERROR');
+    }
+    
+    // Get ID from URL
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return createErrorResponse('ID parameter is required', 400, 'MISSING_ID');
+    }
+    
+    // Parse request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return createErrorResponse('Invalid JSON', 400, 'INVALID_JSON');
+    }
+    
+    // Validation schema (partial update)
+    const schema = {
+      name: { type: 'string', minLength: 2, maxLength: 50 },
+      email: { 
+        type: 'string', 
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ 
+      },
+    };
+    
+    const validationErrors = validateInput(body, schema);
+    if (validationErrors.length > 0) {
+      return createErrorResponse('Validation failed', 400, 'VALIDATION_ERROR', {
+        errors: validationErrors,
+      });
+    }
+    
+    // Update resource
+    const updatedResource = await mockDatabase.update(id, body);
+    
+    if (!updatedResource) {
+      return createErrorResponse('Resource not found', 404, 'NOT_FOUND');
+    }
+    
+    return createResponse({
+      success: true,
+      data: updatedResource,
+      message: 'Resource updated successfully',
+    }, 200, corsHeaders);
+    
+  } catch (error) {
+    console.error('PUT Error:', error);
+    return createErrorResponse('Internal server error', 500, 'PUT_ERROR');
   }
-  
-  .card {
-    border-width: 2px;
+}
+
+// DELETE handler - Delete resource
+export async function DELETE(request) {
+  try {
+    // CORS handling
+    const corsHeaders = handleCors(request);
+    if (!corsHeaders) {
+      return createErrorResponse('Origin not allowed', 403, 'CORS_ERROR');
+    }
+    
+    // Authentication
+    if (!authenticate(request)) {
+      return createErrorResponse('Unauthorized', 401, 'AUTH_ERROR');
+    }
+    
+    // Rate limiting
+    const clientId = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    if (!rateLimit(clientId)) {
+      return createErrorResponse('Rate limit exceeded', 429, 'RATE_LIMIT_ERROR');
+    }
+    
+    // Get ID from URL
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return createErrorResponse('ID parameter is required', 400, 'MISSING_ID');
+    }
+    
+    // Delete resource
+    const deleted = await mockDatabase.delete(id);
+    
+    if (!deleted) {
+      return createErrorResponse('Resource not found', 404, 'NOT_FOUND');
+    }
+    
+    return createResponse({
+      success: true,
+      message: 'Resource deleted successfully',
+    }, 200, corsHeaders);
+    
+  } catch (error) {
+    console.error('DELETE Error:', error);
+    return createErrorResponse('Internal server error', 500, 'DELETE_ERROR');
   }
 }
 
-/* ===== UTILITY ANIMATIONS ===== */
-.animate-bounce-subtle {
-  animation: bounce-subtle 2s infinite;
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 3s infinite;
-}
-
-.animate-spin-slow {
-  animation: spin-slow 3s linear infinite;
-}
-
-@keyframes bounce-subtle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* ===== PRINT STYLES ===== */
-@media print {
-  .btn,
-  .card {
-    box-shadow: none !important;
-    background: white !important;
-    border: 1px solid #000 !important;
-  }
-  
-  .text-neon,
-  .text-gradient {
-    color: #000 !important;
-    text-shadow: none !important;
-    -webkit-text-fill-color: #000 !important;
+// PATCH handler - Partial update
+export async function PATCH(request) {
+  try {
+    // CORS handling
+    const corsHeaders = handleCors(request);
+    if (!corsHeaders) {
+      return createErrorResponse('Origin not allowed', 403, 'CORS_ERROR');
+    }
+    
+    // Authentication
+    if (!authenticate(request)) {
+      return createErrorResponse('Unauthorized', 401, 'AUTH_ERROR');
+    }
+    
+    // Rate limiting
+    const clientId = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    if (!rateLimit(clientId)) {
+      return createErrorResponse('Rate limit exceeded', 429, 'RATE_LIMIT_ERROR');
+    }
+    
+    // Get ID from URL
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return createErrorResponse('ID parameter is required', 400, 'MISSING_ID');
+    }
+    
+    // Parse request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return createErrorResponse('Invalid JSON', 400, 'INVALID_JSON');
+    }
+    
+    // Validation schema (all fields optional for PATCH)
+    const schema = {
+      name: { type: 'string', minLength: 2, maxLength: 50 },
+      email: { 
+        type: 'string', 
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ 
+      },
+    };
+    
+    const validationErrors = validateInput(body, schema);
+    if (validationErrors.length > 0) {
+      return createErrorResponse('Validation failed', 400, 'VALIDATION_ERROR', {
+        errors: validationErrors,
+      });
+    }
+    
+    // Update resource
+    const updatedResource = await mockDatabase.update(id, body);
+    
+    if (!updatedResource) {
+      return createErrorResponse('Resource not found', 404, 'NOT_FOUND');
+    }
+    
+    return createResponse({
+      success: true,
+      data: updatedResource,
+      message: 'Resource updated successfully',
+    }, 200, corsHeaders);
+    
+  } catch (error) {
+    console.error('PATCH Error:', error);
+    return createErrorResponse('Internal server error', 500, 'PATCH_ERROR');
   }
 }

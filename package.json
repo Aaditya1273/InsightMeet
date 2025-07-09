@@ -23,6 +23,7 @@
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
     "dotenv": "^17.0.1",
+    "express-rate-limit": "^7.3.1",
     "file-saver": "^2.0.5",
     "ics": "^3.8.1",
     "jspdf": "^2.5.1",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@playwright/test": "^1.53.2",
     "@types/dom-speech-recognition": "^0.0.6",
+    "@types/express-rate-limit": "^6.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",

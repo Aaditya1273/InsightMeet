@@ -380,9 +380,9 @@ export const uploadFilesWithProgress = async (
                   const timeDiff = currentTime - startTime;
                   const loadedDiff = progressEvent.loaded - lastLoaded;
                   
-                  progress.progress = (progressEvent.loaded / progressEvent.total) * 100;
+                  progress.progress = (progressEvent.loaded / progressEvent.totalLoaded) * 100;
                   progress.speed = timeDiff > 0 ? (loadedDiff / timeDiff) * 1000 : 0;
-                  progress.eta = progress.speed > 0 ? (progressEvent.total - progressEvent.loaded) / progress.speed : 0;
+                  progress.eta = progress.speed > 0 ? (progressEvent.totalLoaded - progressEvent.loaded) / progress.speed : 0;
                   
                   lastLoaded = progressEvent.loaded;
                   updateProgress();

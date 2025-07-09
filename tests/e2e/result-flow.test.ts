@@ -34,7 +34,7 @@ class FileUploadHelper {
     this.page = page;
   }
 
-  async validateFileExists(filePath) {
+  async validateFileExists(filePath: string) {
     try {
       await fs.access(filePath);
       return true;
@@ -43,7 +43,7 @@ class FileUploadHelper {
     }
   }
 
-  async getFileSize(filePath) {
+  async getFileSize(filePath: string) {
     const stats = await fs.stat(filePath);
     return stats.size;
   }
@@ -82,7 +82,7 @@ class FileUploadHelper {
     return this;
   }
 
-  async verifyUploadError(expectedErrorMessage) {
+  async verifyUploadError(expectedErrorMessage?: string) {
     const errorElement = this.page.locator('[data-testid="upload-error"], .error-message, .alert-error');
     await expect(errorElement).toBeVisible({ timeout: 10000 });
     
@@ -121,22 +121,24 @@ class SummaryValidator {
     return this;
   }
 
-  async validateSummaryContent(expectedContent = []) {
-    const bodyContent = this.page.locator('body');
-    
-    // Default content checks
-    const defaultExpectedContent = [
-      'Project Phoenix',
-      'Meeting Summary',
-      'participants',
-      'agenda'
-    ];
+  async validateSummaryContent(expectedContent: string[] = []) {
+    await test.step('Validating summary content', async () => {
+      const bodyContent = this.page.locator('body');
+      
+      // Default content checks
+      const defaultExpectedContent = [
+        'Project Phoenix',
+        'Meeting Summary',
+        'participants',
+        'agenda'
+      ];
 
-    const contentToCheck = expectedContent.length > 0 ? expectedContent : defaultExpectedContent;
+      const contentToCheck = expectedContent.length > 0 ? expectedContent : defaultExpectedContent;
 
-    for (const content of contentToCheck) {
-      await expect(bodyContent).toContainText(content, { timeout: 10000 });
-    }
+      for (const content of contentToCheck) {
+        await expect(bodyContent).toContainText(content, { timeout: 10000 });
+      }
+    });
 
     return this;
   }
@@ -182,8 +184,8 @@ class SummaryValidator {
 
 // Main test suite
 test.describe('File Upload and Summary Generation', () => {
-  let fileUploadHelper;
-  let summaryValidator;
+  let fileUploadHelper: FileUploadHelper;
+  let summaryValidator: SummaryValidator;
 
   test.beforeEach(async ({ page }) => {
     fileUploadHelper = new FileUploadHelper(page);
@@ -241,7 +243,7 @@ test.describe('File Upload and Summary Generation', () => {
     try {
       await fileUploadHelper.validateFileExists(TEST_FILES.largeMeeting);
     } catch {
-      test.skip('Large test file not available');
+      test.skip(true, 'Large test file not available');
     }
 
     await fileUploadHelper.uploadFile(TEST_FILES.largeMeeting, {
@@ -342,7 +344,7 @@ test.describe('File Upload and Summary Generation', () => {
       await page.waitForURL(TEST_CONFIG.RESULTS_URL_PATTERN);
       await summaryValidator.validateSummaryStructure();
     } else {
-      test.skip('Drag and drop not implemented');
+      test.skip(true, 'Drag and drop not implemented');
     }
   });
 
