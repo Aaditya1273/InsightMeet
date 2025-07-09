@@ -146,12 +146,19 @@ class EnhancedSummaryGenerator {
 
   // Streaming reader for large files
   private async readLargeFile(filePath: string): Promise<string> {
-    const chunks: string[] = [];
+    const chunks: (string | Buffer)[] = [];
     const readStream = createReadStream(filePath, { encoding: 'utf-8' });
     
     return new Promise((resolve, reject) => {
-      readStream.on('data', (chunk: string) => chunks.push(chunk));
-      readStream.on('end', () => resolve(chunks.join('')));
+      readStream.on('data', (chunk: string | Buffer) => {
+        chunks.push(chunk);
+      });
+      readStream.on('end', () => {
+        const content = chunks.map(chunk => 
+          typeof chunk === 'string' ? chunk : chunk.toString('utf-8')
+        ).join('');
+        resolve(content);
+      });
       readStream.on('error', reject);
     });
   }
@@ -200,6 +207,10 @@ class EnhancedSummaryGenerator {
         participants: this.extractParticipants(content),
         topics: this.extractTopics(content),
         keyDecisions: this.extractDecisions(content),
+        fileName,
+        fileSize: Buffer.byteLength(content, 'utf8'),
+        generatedAt: new Date().toISOString(),
+        version: this.VERSION,
         metadata: {
           fileName,
           fileSize: Buffer.byteLength(content, 'utf8'),
@@ -719,4 +730,4 @@ if (require.main === module) {
   main().catch(console.error);
 }
 
-export { EnhancedSummaryGenerator, ProcessingOptions, SummaryResult };
+export { EnhancedSummaryGenerator, type ProcessingOptions, type SummaryResult };
