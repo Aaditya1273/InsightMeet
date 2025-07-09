@@ -248,14 +248,12 @@ interface UploadProps {
   enableMicroservices?: boolean;
   enableGraphQL?: boolean;
   enableREST?: boolean;
-  enableWebSocket?: boolean;
   enableWebRTC?: boolean;
   enableP2P?: boolean;
   enableBlockchain?: boolean;
   enableWeb3?: boolean;
   enableNFT?: boolean;
   enableCrypto?: boolean;
-  enableQuantum?: boolean;
   enableAR?: boolean;
   enableVR?: boolean;
   enableMR?: boolean;
@@ -349,7 +347,6 @@ interface UploadProps {
   enableMailgun?: boolean;
   enableAWS?: boolean;
   enableAzure?: boolean;
-  enableGCP?: boolean;
   enableVercel?: boolean;
   enableNetlify?: boolean;
   enableCloudflare?: boolean;
@@ -418,8 +415,6 @@ interface UploadProps {
   enableGlitch?: boolean;
   enableObservable?: boolean;
   enableRunkit?: boolean;
-  enableJupyter?: boolean;
-  enableColab?: boolean;
   enableKaggle?: boolean;
   enableDeepNote?: boolean;
   enableDatabricks?: boolean;
@@ -433,7 +428,6 @@ interface UploadProps {
   enableTensorFlow?: boolean;
   enablePyTorch?: boolean;
   enableScikit?: boolean;
-  enablePandas?: boolean;
   enableNumPy?: boolean;
   enableJAX?: boolean;
   enableHuggingFace?: boolean;
@@ -450,7 +444,6 @@ interface UploadProps {
   enableFigma?: boolean;
   enableSketch?: boolean;
   enableAdobe?: boolean;
-  enableAffinity?: boolean;
   enableBlender?: boolean;
   enableMaya?: boolean;
   enableCinema4D?: boolean;
@@ -508,7 +501,6 @@ interface UploadProps {
   enableSharedWorker?: boolean;
   enableBroadcastChannel?: boolean;
   enableMessagePort?: boolean;
-  enableChannel?: boolean;
   enableWebRTCDataChannel?: boolean;
   enableWebSocket?: boolean;
   enableSSE?: boolean;
@@ -568,7 +560,6 @@ interface UploadProps {
   enableSWG?: boolean;
   enableZTNA?: boolean;
   enableSASE?: boolean;
-  enableSSE?: boolean;
   enableSD?: boolean;
   enableMPLS?: boolean;
   enableIPSec?: boolean;
@@ -757,7 +748,6 @@ interface UploadProps {
   enableSips?: boolean;
   enableToth?: boolean;
   enableRadke?: boolean;
-  enableWeber?: boolean;
   enableIntraparticle?: boolean;
   enablePseudoFirst?: boolean;
   enablePseudoSecond?: boolean;
@@ -885,8 +875,6 @@ interface UploadProps {
   enableNano?: boolean;
   enableGit?: boolean;
   enableGitHub?: boolean;
-  enableGitLab?: boolean;
-  enableBitbucket?: boolean;
   enableSVN?: boolean;
   enableMercurial?: boolean;
   enablePerforce?: boolean;
@@ -909,11 +897,6 @@ interface UploadProps {
   enableAccuRev?: boolean;
   enableIntegrity?: boolean;
   enableContinuum?: boolean;
-  enableTeamCity?: boolean;
-  enableBamboo?: boolean;
-  enableCircleCI?: boolean;
-  enableTravisCI?: boolean;
-  enableAppVeyor?: boolean;
   enableCodeship?: boolean;
   enableSemaphore?: boolean;
   enableWercker?: boolean;
@@ -925,9 +908,6 @@ interface UploadProps {
   enableAWSCodeBuild?: boolean;
   enableAzurePipelines?: boolean;
   enableGoogleCloudBuild?: boolean;
-  enableGitHubActions?: boolean;
-  enableGitLabCI?: boolean;
-  enableBitbucketPipelines?: boolean;
 }
 
 const AdvancedFileUpload: React.FC<UploadProps> = ({
