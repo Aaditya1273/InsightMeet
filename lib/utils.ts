@@ -349,7 +349,9 @@ export function memoize<T extends (...args: any[]) => any>(
     
     if (cache.size >= maxSize) {
       const firstKey = cache.keys().next().value;
-      cache.delete(firstKey);
+      if (firstKey !== undefined) {
+        cache.delete(firstKey);
+      }
     }
     
     cache.set(key, { value: result, timestamp: now });
@@ -777,7 +779,10 @@ export const validators = {
 export const environment = {
   isBrowser: typeof window !== 'undefined',
   isNode: typeof process !== 'undefined' && process.versions?.node,
-  isWorker: typeof window === 'undefined' && typeof importScripts === 'function',
+  isWorker: typeof window === 'undefined' && 
+           (typeof importScripts === 'function' || 
+            (typeof self !== 'undefined' && self.constructor && 
+             self.constructor.name === 'DedicatedWorkerGlobalScope')),
   isMobile: typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent),
   isTouch: typeof window !== 'undefined' && 'ontouchstart' in window,
   isDarkMode: typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches,
