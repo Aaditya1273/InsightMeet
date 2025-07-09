@@ -129,7 +129,7 @@ const FILE_CATEGORIES = {
   }
 };
 
-interface FileMetadata {
+export interface FileMetadata {
   id: string;
   file: File;
   category: string;
@@ -168,7 +168,7 @@ interface UploadProps {
   accept?: string;
   maxSize?: number;
   maxFiles?: number;
-  multiple?: boolean;
+  allowMultiple?: boolean;
   autoUpload?: boolean;
   showPreview?: boolean;
   showProgress?: boolean;
@@ -225,7 +225,6 @@ interface UploadProps {
   enableSSO?: boolean;
   enablePermissions?: boolean;
   enableAuditLog?: boolean;
-  enableCompliance?: boolean;
   enableGDPR?: boolean;
   enableHIPAA?: boolean;
   enableSOX?: boolean;
@@ -555,7 +554,6 @@ interface UploadProps {
   enableSCA?: boolean;
   enableContainer?: boolean;
   enableInfrastructure?: boolean;
-  enableCompliance?: boolean;
   enablePenTest?: boolean;
   enableRedTeam?: boolean;
   enableBlueTeam?: boolean;
@@ -951,7 +949,7 @@ const AdvancedFileUpload: React.FC<UploadProps> = ({
   accept = "*/*",
   maxSize = 50 * 1024 * 1024, // 50MB default
   maxFiles = 10,
-  multiple = true,
+  allowMultiple = true,
   autoUpload = false,
   showPreview = true,
   showProgress = true,
@@ -1414,7 +1412,7 @@ const AdvancedFileUpload: React.FC<UploadProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          multiple={multiple}
+          multiple={allowMultiple}
           accept={accept}
           onChange={handleInputChange}
           className="hidden"
@@ -1431,7 +1429,7 @@ const AdvancedFileUpload: React.FC<UploadProps> = ({
               {dragActive ? 'Drop files here' : 'Choose files or drag them here'}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Support for {multiple ? 'multiple files' : 'single file'} • Max {formatFileSize(maxSize)} per file
+              Support for {allowMultiple ? 'multiple files' : 'single file'} • Max {formatFileSize(maxSize)} per file
             </p>
           </div>
         </div>
