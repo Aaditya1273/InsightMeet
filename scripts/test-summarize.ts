@@ -8,9 +8,17 @@ import cluster from 'cluster';
 import os from 'os';
 
 // Enhanced interfaces for better type safety
+interface ActionItem {
+  text: string;
+  priority: 'high' | 'medium' | 'low';
+  assignee?: string;
+  dueDate?: string;
+  category?: string;
+}
+
 interface SummaryResult {
   summary: string;
-  actionItems: string[];
+  actionItems: ActionItem[];
   followUpText: string;
   keyDecisions?: string[];
   participants?: string[];
@@ -132,18 +140,18 @@ class EnhancedSummaryGenerator {
       
       return buffer.toString(encoding as BufferEncoding);
     } catch (error) {
-      throw new Error(`Failed to read file ${filePath}: ${error.message}`);
+      throw new Error(`Failed to read file ${filePath}: ${(error as Error).message}`);
     }
   }
 
   // Streaming reader for large files
   private async readLargeFile(filePath: string): Promise<string> {
-    const chunks: Buffer[] = [];
-    const readStream = createReadStream(filePath);
+    const chunks: string[] = [];
+    const readStream = createReadStream(filePath, { encoding: 'utf-8' });
     
     return new Promise((resolve, reject) => {
-      readStream.on('data', (chunk) => chunks.push(chunk));
-      readStream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+      readStream.on('data', (chunk: string) => chunks.push(chunk));
+      readStream.on('end', () => resolve(chunks.join('')));
       readStream.on('error', reject);
     });
   }
@@ -202,7 +210,8 @@ class EnhancedSummaryGenerator {
 
       return enhancedResult;
     } catch (error) {
-      if (attempt < this.options.retryAttempts) {
+      const retryAttempts = this.options.retryAttempts ?? 3; // Provide default value if undefined
+      if (attempt < retryAttempts) {
         console.warn(`Attempt ${attempt} failed for ${fileName}, retrying...`);
         await this.delay(1000 * attempt); // Exponential backoff
         return this.generateSummaryWithRetry(content, fileName, attempt + 1);
@@ -364,12 +373,12 @@ class EnhancedSummaryGenerator {
       return result;
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      console.error(`❌ Failed: ${path.basename(filePath)} - ${error.message}`);
+      console.error(`❌ Failed: ${path.basename(filePath)} - ${(error as Error).message}`);
       
       this.metrics.failedFiles++;
       this.metrics.errors.push({
         file: filePath,
-        error: error.message,
+        error: (error as Error).message,
         timestamp: new Date().toISOString()
       });
       
@@ -383,7 +392,7 @@ class EnhancedSummaryGenerator {
     
     if (this.options.concurrent) {
       // Process files concurrently with controlled concurrency
-      const batches = this.chunkArray(files, this.options.maxConcurrency);
+      const batches = this.chunkArray(files, this.options.maxConcurrency ?? 5);
       
       for (const batch of batches) {
         const batchPromises = batch.map(async (filePath) => {
@@ -492,7 +501,7 @@ class EnhancedSummaryGenerator {
       if (result.actionItems.length > 0) {
         markdown += `### Action Items\n`;
         result.actionItems.forEach((item, i) => {
-          markdown += `${i + 1}. ${item}\n`;
+          markdown += `${i + 1}. ${item.text} (${item.priority})\n`;
         });
         markdown += '\n';
       }
@@ -553,7 +562,7 @@ class EnhancedSummaryGenerator {
         <h3>Action Items</h3>
         <div class="action-items">
             <ol>
-                ${result.actionItems.map(item => `<li>${item}</li>`).join('')}
+                ${result.actionItems.map(item => `<li>${item.text} (${item.priority})</li>`).join('')}
             </ol>
         </div>
         

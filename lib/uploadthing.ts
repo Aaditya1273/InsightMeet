@@ -1,6 +1,7 @@
 import { createUploadthing, type FileRouter } from 'uploadthing/next';
-import { UploadButton, UploadDropzone } from '@uploadthing/react';
+import { UploadButton as UploadButtonType, UploadDropzone } from '@uploadthing/react';
 import { z } from 'zod';
+import React from 'react'; // Import React
 
 const f = createUploadthing();
 
@@ -220,7 +221,6 @@ export const ourFileRouter = {
   // Specialized audio uploader for meeting recordings
   audioUploader: f({
     'audio/mpeg': { maxFileSize: '256MB', maxFileCount: 1 },
-    'audio/wav': { maxFileSize: '256MB', maxFileCount: 1 },
     'audio/mp4': { maxFileSize: '256MB', maxFileCount: 1 },
     'audio/webm': { maxFileSize: '256MB', maxFileCount: 1 },
   })
@@ -280,7 +280,7 @@ export type OurFileRouter = typeof ourFileRouter;
 export { UploadButton, UploadDropzone };
 
 // Enhanced upload button configurations
-export const EnhancedUploadButton = ({
+const EnhancedUploadButton = ({
   endpoint = 'meetingUploader',
   onClientUploadComplete,
   onUploadError,
@@ -293,9 +293,9 @@ export const EnhancedUploadButton = ({
   onUploadError?: (error: Error) => void;
   onUploadBegin?: (name: string) => void;
   onUploadProgress?: (progress: number) => void;
-} & any) => {
+} & React.ComponentProps<typeof UploadButtonType>) => {
   return (
-    <UploadButton
+    <UploadButtonType
       endpoint={endpoint}
       onClientUploadComplete={onClientUploadComplete}
       onUploadError={onUploadError}

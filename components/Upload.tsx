@@ -370,7 +370,6 @@ interface UploadProps {
   enableGitHubPages?: boolean;
   enableGitLabPages?: boolean;
   enableBitbucket?: boolean;
-  enableJenkins?: boolean;
   enableCircleCI?: boolean;
   enableTravisCI?: boolean;
   enableAppVeyor?: boolean;
@@ -913,15 +912,8 @@ interface UploadProps {
   enableContinuum?: boolean;
   enableTeamCity?: boolean;
   enableBamboo?: boolean;
-  enableJenkins?: boolean;
-  enableHudson?: boolean;
-  enableCruiseControl?: boolean;
-  enableBuildbot?: boolean;
-  enableGoCD?: boolean;
-  enableConcourse?: boolean;
-  enableDrone?: boolean;
   enableCircleCI?: boolean;
-  enableTravis?: boolean;
+  enableTravisCI?: boolean;
   enableAppVeyor?: boolean;
   enableCodeship?: boolean;
   enableSemaphore?: boolean;
