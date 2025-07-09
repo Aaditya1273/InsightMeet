@@ -20,46 +20,56 @@ type FileSize = "1B" | "1KB" | "1MB" | "1GB" | "2B" | "2KB" | "2MB" | "2GB" | "4
 // Supported file types with their configurations
 const SUPPORTED_FILE_TYPES = {
   // Text files
-  'text/plain': { maxFileSize: '16MB' as FileSize, maxFileCount: 10, category: 'document' },
-  'text/csv': { maxFileSize: '16MB' as FileSize, maxFileCount: 10, category: 'document' },
+  'text/plain': { maxFileSize: '16MB' as FileSize, maxFileCount: 10, category: 'document' } as const,
+  'text/csv': { maxFileSize: '16MB' as FileSize, maxFileCount: 10, category: 'document' } as const,
   
   // Images
-  'image/jpeg': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' },
-  'image/png': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' },
-  'image/webp': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' },
-  'image/svg+xml': { maxFileSize: '4MB' as FileSize, maxFileCount: 10, category: 'image' },
+  'image/jpeg': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' } as const,
+  'image/png': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' } as const,
+  'image/webp': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' } as const,
+  'image/svg+xml': { maxFileSize: '4MB' as FileSize, maxFileCount: 10, category: 'image' } as const,
   
   // Audio files
-  'audio/mp3': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
-  'audio/mpeg': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
-  'audio/wav': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
-  'audio/ogg': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
-  'audio/webm': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
-  'audio/mp4': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
-  'audio/x-m4a': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
+  'audio/mp3': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' } as const,
+  'audio/mpeg': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' } as const,
+  'audio/wav': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' } as const,
+  'audio/ogg': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' } as const,
+  'audio/webm': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' } as const,
+  'audio/mp4': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' } as const,
+  'audio/x-m4a': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' } as const,
+  
+  // Video files
+  'video/mp4': { maxFileSize: '256MB' as FileSize, maxFileCount: 5, category: 'video' } as const,
+  'video/webm': { maxFileSize: '256MB' as FileSize, maxFileCount: 5, category: 'video' } as const,
+  'video/quicktime': { maxFileSize: '256MB' as FileSize, maxFileCount: 5, category: 'video' } as const,
+  'video/x-msvideo': { maxFileSize: '256MB' as FileSize, maxFileCount: 5, category: 'video' } as const,
   
   // Documents
-  'application/msword': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
+  'application/msword': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' } as const,
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { 
     maxFileSize: '32MB' as FileSize, 
     maxFileCount: 5, 
     category: 'document' 
-  },
-  'application/vnd.ms-excel': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
+  } as const,
+  'application/vnd.ms-excel': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' } as const,
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { 
     maxFileSize: '32MB' as FileSize, 
     maxFileCount: 5, 
     category: 'document' 
-  },
-  'application/vnd.ms-powerpoint': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
+  } as const,
+  'application/vnd.ms-powerpoint': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' } as const,
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': { 
     maxFileSize: '32MB' as FileSize, 
     maxFileCount: 5, 
     category: 'document' 
-  },
-  'application/pdf': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
+  } as const,
+  'application/pdf': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' } as const,
 } as const;
 
+// Extract the category type from the SUPPORTED_FILE_TYPES values
+type FileCategory = typeof SUPPORTED_FILE_TYPES[keyof typeof SUPPORTED_FILE_TYPES]['category'];
+
+// Supported file types with their configurations
 type SupportedFileTypes = keyof typeof SUPPORTED_FILE_TYPES;
 
 // Enhanced file router with multiple upload endpoints
@@ -68,7 +78,7 @@ export const ourFileRouter = {
   meetingUploader: f(SUPPORTED_FILE_TYPES as Record<keyof typeof SUPPORTED_FILE_TYPES, { 
     maxFileSize: FileSize; 
     maxFileCount: number;
-    category: string;
+    category: FileCategory;
   }>)
     .middleware(async ({ req, files }) => {
       // Enhanced authentication and validation
@@ -288,13 +298,14 @@ const processFileMetadata = (file: any, metadata: any): any => {
 };
 
 // Enhanced upload button configurations
-interface EnhancedUploadButtonProps {
+interface EnhancedUploadButtonProps extends Omit<React.ComponentProps<typeof UploadButtonBase>, 
+  'onClientUploadComplete' | 'onUploadError' | 'onUploadBegin' | 'onUploadProgress'
+> {
   endpoint?: keyof OurFileRouter;
   onClientUploadComplete?: (res: any[]) => void;
   onUploadError?: (error: Error) => void;
   onUploadBegin?: (name: string) => void;
   onUploadProgress?: (progress: number) => void;
-  [key: string]: any;
 }
 
 export const UploadButton: React.FC<EnhancedUploadButtonProps> = ({
@@ -305,15 +316,17 @@ export const UploadButton: React.FC<EnhancedUploadButtonProps> = ({
   onUploadProgress,
   ...props
 }) => {
-  return (
-    <UploadButtonBase
-      endpoint={endpoint}
-      onClientUploadComplete={onClientUploadComplete}
-      onUploadError={onUploadError}
-      onUploadBegin={onUploadBegin}
-      onUploadProgress={onUploadProgress}
-      {...props}
-    />
+  return React.createElement(
+    UploadButtonBase,
+    {
+      endpoint: endpoint,
+      onClientUploadComplete: onClientUploadComplete,
+      onUploadError: onUploadError,
+      onUploadBegin: onUploadBegin,
+      onUploadProgress: onUploadProgress,
+      ...props
+    },
+    []
   );
 };
 
