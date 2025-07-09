@@ -75,8 +75,8 @@ export default function EpicUploadPage() {
   ];
 
   const getProgressColor = () => {
-    if (progress.percentage < 30) return 'from-blue-400 to-purple-600';
-    if (progress.percentage < 70) return 'from-purple-400 to-pink-600';
+    if (progress?.percentage < 30) return 'from-blue-400 to-purple-600';
+    if (progress?.percentage < 70) return 'from-purple-400 to-pink-600';
     return 'from-pink-400 to-red-600';
   };
 
@@ -164,13 +164,13 @@ export default function EpicUploadPage() {
                   <div className="w-full bg-white/10 rounded-full h-3 mb-4 overflow-hidden">
                     <div 
                       className={`h-full bg-gradient-to-r ${getProgressColor()} rounded-full transition-all duration-300 ease-out relative`}
-                      style={{ width: `${progress.percentage}%` }}
+                      style={{ width: `${progress?.percentage ?? 0}%` }}
                     >
                       <div className="absolute inset-0 bg-white/20 animate-pulse" />
                     </div>
                   </div>
                   <p className="text-sm text-gray-400">
-                    {progress.percentage}% complete - Extracting insights...
+                    {progress?.percentage ?? 0}% complete - Extracting insights...
                   </p>
                 </div>
               </div>
