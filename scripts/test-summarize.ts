@@ -27,7 +27,7 @@ interface SummaryResult {
   confidence?: number;
   processingTime?: number;
   wordCount?: number;
-  metadata?: {
+  metadata: {
     fileName: string;
     fileSize: number;
     generatedAt: string;
@@ -199,7 +199,9 @@ class EnhancedSummaryGenerator {
       
       // Enhanced result with additional metadata
       const enhancedResult: SummaryResult = {
-        ...result,
+        summary: result.summary,
+        actionItems: result.actionItems,
+        followUpText: result.followUpText,
         processingTime,
         wordCount: content.split(/\s+/).length,
         confidence: this.calculateConfidence(result, content),
@@ -207,10 +209,6 @@ class EnhancedSummaryGenerator {
         participants: this.extractParticipants(content),
         topics: this.extractTopics(content),
         keyDecisions: this.extractDecisions(content),
-        fileName,
-        fileSize: Buffer.byteLength(content, 'utf8'),
-        generatedAt: new Date().toISOString(),
-        version: this.VERSION,
         metadata: {
           fileName,
           fileSize: Buffer.byteLength(content, 'utf8'),

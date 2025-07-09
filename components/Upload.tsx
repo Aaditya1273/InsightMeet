@@ -860,8 +860,7 @@ interface UploadProps {
   enableSage?: boolean;
   enableSympy?: boolean;
   enableNumpy?: boolean;
-  enableScipy?: boolean
-  ?: boolean;
+  enableScipy?: boolean;
   enablePandas?: boolean;
   enableSklearn?: boolean;
   enableTensorflow?: boolean;
