@@ -1,7 +1,7 @@
 import { createUploadthing, type FileRouter } from 'uploadthing/next';
-import { UploadButton as UploadButtonType, UploadDropzone } from '@uploadthing/react';
+import { UploadButton as UploadButtonBase, UploadDropzone as UploadDropzoneBase } from '@uploadthing/react';
 import { z } from 'zod';
-import React from 'react'; // Import React
+import * as React from 'react';
 
 const f = createUploadthing();
 
@@ -14,100 +14,62 @@ const fileValidationSchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
-// Supported file types with enhanced configuration
+// Define the file size type that UploadThing expects
+type FileSize = "1B" | "1KB" | "1MB" | "1GB" | "2B" | "2KB" | "2MB" | "2GB" | "4B" | "4KB" | "4MB" | "4GB" | "8B" | "8KB" | "8MB" | "8GB" | "16B" | "16KB" | "16MB" | "16GB" | "32MB" | "32GB" | "64MB" | "64GB" | "128MB" | "256MB" | "512MB" | "1024KB" | "1024MB" | "1024GB";
+
+// Supported file types with their configurations
 const SUPPORTED_FILE_TYPES = {
+  // Text files
+  'text/plain': { maxFileSize: '16MB' as FileSize, maxFileCount: 10, category: 'document' },
+  'text/csv': { maxFileSize: '16MB' as FileSize, maxFileCount: 10, category: 'document' },
+  
+  // Images
+  'image/jpeg': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' },
+  'image/png': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' },
+  'image/webp': { maxFileSize: '8MB' as FileSize, maxFileCount: 10, category: 'image' },
+  'image/svg+xml': { maxFileSize: '4MB' as FileSize, maxFileCount: 10, category: 'image' },
+  
   // Audio files
-  'audio/mpeg': { maxFileSize: '128MB', maxFileCount: 1, category: 'audio' },
-  'audio/wav': { maxFileSize: '128MB', maxFileCount: 1, category: 'audio' },
-  'audio/mp4': { maxFileSize: '128MB', maxFileCount: 1, category: 'audio' },
-  'audio/x-m4a': { maxFileSize: '128MB', maxFileCount: 1, category: 'audio' },
-  'audio/webm': { maxFileSize: '128MB', maxFileCount: 1, category: 'audio' },
-  'audio/ogg': { maxFileSize: '128MB', maxFileCount: 1, category: 'audio' },
+  'audio/mp3': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
+  'audio/mpeg': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
+  'audio/wav': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
+  'audio/ogg': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
+  'audio/webm': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
+  'audio/mp4': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
+  'audio/x-m4a': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'audio' },
   
-  // Document files
-  'application/pdf': { maxFileSize: '32MB', maxFileCount: 5, category: 'document' },
-  'text/plain': { maxFileSize: '16MB', maxFileCount: 5, category: 'document' },
-  'application/msword': { maxFileSize: '32MB', maxFileCount: 5, category: 'document' },
+  // Documents
+  'application/msword': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { 
-    maxFileSize: '32MB', maxFileCount: 5, category: 'document' 
+    maxFileSize: '32MB' as FileSize, 
+    maxFileCount: 5, 
+    category: 'document' 
   },
-  'application/vnd.ms-powerpoint': { maxFileSize: '32MB', maxFileCount: 5, category: 'document' },
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': { 
-    maxFileSize: '32MB', maxFileCount: 5, category: 'document' 
-  },
-  'application/vnd.ms-excel': { maxFileSize: '32MB', maxFileCount: 5, category: 'document' },
+  'application/vnd.ms-excel': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { 
-    maxFileSize: '32MB', maxFileCount: 5, category: 'document' 
+    maxFileSize: '32MB' as FileSize, 
+    maxFileCount: 5, 
+    category: 'document' 
   },
-  'text/csv': { maxFileSize: '16MB', maxFileCount: 5, category: 'document' },
-  'application/rtf': { maxFileSize: '16MB', maxFileCount: 5, category: 'document' },
-  
-  // Image files (for meeting screenshots, diagrams)
-  'image/jpeg': { maxFileSize: '8MB', maxFileCount: 10, category: 'image' },
-  'image/png': { maxFileSize: '8MB', maxFileCount: 10, category: 'image' },
-  'image/webp': { maxFileSize: '8MB', maxFileCount: 10, category: 'image' },
-  'image/svg+xml': { maxFileSize: '4MB', maxFileCount: 10, category: 'image' },
-  
-  // Video files (for meeting recordings)
-  'video/mp4': { maxFileSize: '512MB', maxFileCount: 1, category: 'video' },
-  'video/webm': { maxFileSize: '512MB', maxFileCount: 1, category: 'video' },
-  'video/quicktime': { maxFileSize: '512MB', maxFileCount: 1, category: 'video' },
+  'application/vnd.ms-powerpoint': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': { 
+    maxFileSize: '32MB' as FileSize, 
+    maxFileCount: 5, 
+    category: 'document' 
+  },
+  'application/pdf': { maxFileSize: '32MB' as FileSize, maxFileCount: 5, category: 'document' },
 } as const;
 
-// Utility functions for file processing
-const generateFileKey = (originalName: string, timestamp: number): string => {
-  const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-  return `${timestamp}_${sanitizedName}`;
-};
-
-const validateFileIntegrity = (file: { name: string; size: number; type: string }) => {
-  const errors: string[] = [];
-  
-  // Check file name
-  if (!file.name || file.name.length > 255) {
-    errors.push('Invalid file name length');
-  }
-  
-  // Check for potentially dangerous file extensions
-  const dangerousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.pif', '.com', '.js', '.vbs'];
-  const hasExt = dangerousExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-  if (hasExt) {
-    errors.push('File type not allowed for security reasons');
-  }
-  
-  // Check file size
-  if (file.size <= 0) {
-    errors.push('File appears to be empty');
-  }
-  
-  // Check MIME type
-  if (!SUPPORTED_FILE_TYPES[file.type as keyof typeof SUPPORTED_FILE_TYPES]) {
-    errors.push(`File type ${file.type} is not supported`);
-  }
-  
-  return errors;
-};
-
-const processFileMetadata = (file: any, metadata: any) => {
-  const timestamp = Date.now();
-  const fileCategory = SUPPORTED_FILE_TYPES[file.type as keyof typeof SUPPORTED_FILE_TYPES]?.category || 'unknown';
-  
-  return {
-    ...metadata,
-    uploadTimestamp: timestamp,
-    originalFileName: file.name,
-    fileSize: file.size,
-    fileType: file.type,
-    fileCategory,
-    processedAt: new Date().toISOString(),
-    fileKey: generateFileKey(file.name, timestamp),
-  };
-};
+type SupportedFileTypes = keyof typeof SUPPORTED_FILE_TYPES;
 
 // Enhanced file router with multiple upload endpoints
 export const ourFileRouter = {
   // Main meeting uploader with comprehensive file support
-  meetingUploader: f(SUPPORTED_FILE_TYPES)
+  meetingUploader: f(SUPPORTED_FILE_TYPES as Record<keyof typeof SUPPORTED_FILE_TYPES, { 
+    maxFileSize: FileSize; 
+    maxFileCount: number;
+    category: string;
+  }>)
     .middleware(async ({ req, files }) => {
       // Enhanced authentication and validation
       const timestamp = Date.now();
@@ -220,10 +182,10 @@ export const ourFileRouter = {
 
   // Specialized audio uploader for meeting recordings
   audioUploader: f({
-    'audio/mpeg': { maxFileSize: '256MB', maxFileCount: 1 },
-    'audio/mp4': { maxFileSize: '256MB', maxFileCount: 1 },
-    'audio/webm': { maxFileSize: '256MB', maxFileCount: 1 },
-  })
+    'audio/mpeg': { maxFileSize: '256MB' as FileSize, maxFileCount: 1 },
+    'audio/mp4': { maxFileSize: '256MB' as FileSize, maxFileCount: 1 },
+    'audio/webm': { maxFileSize: '256MB' as FileSize, maxFileCount: 1 },
+  } as const)
     .middleware(async ({ req }) => ({
       userId: req.headers.get('user-id') || 'anonymous',
       uploadType: 'audio-recording',
@@ -245,13 +207,13 @@ export const ourFileRouter = {
 
   // Batch document uploader
   documentBatchUploader: f({
-    'application/pdf': { maxFileSize: '32MB', maxFileCount: 20 },
-    'text/plain': { maxFileSize: '16MB', maxFileCount: 20 },
-    'application/msword': { maxFileSize: '32MB', maxFileCount: 20 },
+    'application/pdf': { maxFileSize: '32MB' as FileSize, maxFileCount: 20 },
+    'text/plain': { maxFileSize: '16MB' as FileSize, maxFileCount: 20 },
+    'application/msword': { maxFileSize: '32MB' as FileSize, maxFileCount: 20 },
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { 
-      maxFileSize: '32MB', maxFileCount: 20 
+      maxFileSize: '32MB' as FileSize, maxFileCount: 20 
     },
-  })
+  } as const)
     .middleware(async ({ req }) => ({
       userId: req.headers.get('user-id') || 'anonymous',
       batchId: `batch_${Date.now()}`,
@@ -273,29 +235,78 @@ export const ourFileRouter = {
 
 } satisfies FileRouter;
 
-// Enhanced TypeScript types
 export type OurFileRouter = typeof ourFileRouter;
 
-// Export enhanced components with better configuration
-export { UploadButton, UploadDropzone };
+// Utility functions for file processing
+const generateFileKey = (originalName: string, timestamp: number): string => {
+  const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  return `${timestamp}_${sanitizedName}`;
+};
+
+const validateFileIntegrity = (file: { name: string; size: number; type: string }): string[] => {
+  const errors: string[] = [];
+  
+  // Check file name
+  if (!file.name || file.name.length > 255) {
+    errors.push('Invalid file name length');
+  }
+  
+  // Check for potentially dangerous file extensions
+  const dangerousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.pif', '.com', '.js', '.vbs'];
+  const hasExt = dangerousExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+  if (hasExt) {
+    errors.push('File type not allowed for security reasons');
+  }
+  
+  // Check file size
+  if (file.size <= 0) {
+    errors.push('File appears to be empty');
+  }
+  
+  // Check MIME type
+  if (!SUPPORTED_FILE_TYPES[file.type as keyof typeof SUPPORTED_FILE_TYPES]) {
+    errors.push(`File type ${file.type} is not supported`);
+  }
+  
+  return errors;
+};
+
+const processFileMetadata = (file: any, metadata: any): any => {
+  const timestamp = Date.now();
+  const fileCategory = SUPPORTED_FILE_TYPES[file.type as keyof typeof SUPPORTED_FILE_TYPES]?.category || 'unknown';
+  
+  return {
+    ...metadata,
+    uploadTimestamp: timestamp,
+    originalFileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    fileCategory,
+    processedAt: new Date().toISOString(),
+    fileKey: generateFileKey(file.name, timestamp),
+  };
+};
 
 // Enhanced upload button configurations
-const EnhancedUploadButton = ({
+interface EnhancedUploadButtonProps {
+  endpoint?: keyof OurFileRouter;
+  onClientUploadComplete?: (res: any[]) => void;
+  onUploadError?: (error: Error) => void;
+  onUploadBegin?: (name: string) => void;
+  onUploadProgress?: (progress: number) => void;
+  [key: string]: any;
+}
+
+export const UploadButton: React.FC<EnhancedUploadButtonProps> = ({
   endpoint = 'meetingUploader',
   onClientUploadComplete,
   onUploadError,
   onUploadBegin,
   onUploadProgress,
   ...props
-}: {
-  endpoint?: keyof OurFileRouter;
-  onClientUploadComplete?: (res: any[]) => void;
-  onUploadError?: (error: Error) => void;
-  onUploadBegin?: (name: string) => void;
-  onUploadProgress?: (progress: number) => void;
-} & React.ComponentProps<typeof UploadButtonType>) => {
+}) => {
   return (
-    <UploadButtonType
+    <UploadButtonBase
       endpoint={endpoint}
       onClientUploadComplete={onClientUploadComplete}
       onUploadError={onUploadError}
@@ -306,23 +317,16 @@ const EnhancedUploadButton = ({
   );
 };
 
-// Enhanced dropzone component
-export const EnhancedUploadDropzone = ({
+export const UploadDropzone: React.FC<EnhancedUploadButtonProps> = ({
   endpoint = 'meetingUploader',
   onClientUploadComplete,
   onUploadError,
   onUploadBegin,
   onUploadProgress,
   ...props
-}: {
-  endpoint?: keyof OurFileRouter;
-  onClientUploadComplete?: (res: any[]) => void;
-  onUploadError?: (error: Error) => void;
-  onUploadBegin?: (name: string) => void;
-  onUploadProgress?: (progress: number) => void;
-} & any) => {
+}) => {
   return (
-    <UploadDropzone
+    <UploadDropzoneBase
       endpoint={endpoint}
       onClientUploadComplete={onClientUploadComplete}
       onUploadError={onUploadError}
@@ -335,34 +339,33 @@ export const EnhancedUploadDropzone = ({
 
 // Utility functions for client-side usage
 export const fileUtils = {
-  validateFileSize: (file: File, maxSize: string) => {
+  validateFileSize: (file: File, maxSize: string): boolean => {
     const sizeInBytes = parseInt(maxSize.replace(/\D/g, '')) * 1024 * 1024;
     return file.size <= sizeInBytes;
   },
   
-  getFileCategory: (fileType: string) => {
-    return SUPPORTED_FILE_TYPES[fileType as keyof typeof SUPPORTED_FILE_TYPES]?.category || 'unknown';
+  getFileCategory: (fileType: string): string => {
+    return (SUPPORTED_FILE_TYPES as Record<string, { category: string }>)[fileType]?.category || 'unknown';
   },
   
-  formatFileSize: (bytes: number) => {
+  formatFileSize: (bytes: number): string => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 Bytes';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   },
   
-  getSupportedFileTypes: () => Object.keys(SUPPORTED_FILE_TYPES),
+  getSupportedFileTypes: (): string[] => Object.keys(SUPPORTED_FILE_TYPES),
   
-  isFileTypeSupported: (fileType: string) => {
+  isFileTypeSupported: (fileType: string): boolean => {
     return fileType in SUPPORTED_FILE_TYPES;
   },
 };
 
 // Error handling utilities
-export const uploadErrorHandler = (error: Error) => {
+export const uploadErrorHandler = (error: Error): string => {
   console.error('Upload error:', error);
   
-  // Categorize and handle different types of errors
   if (error.message.includes('File too large')) {
     return 'File size exceeds the maximum allowed limit';
   } else if (error.message.includes('File type not supported')) {
@@ -371,7 +374,6 @@ export const uploadErrorHandler = (error: Error) => {
     return 'Network error occurred. Please check your connection and try again';
   } else if (error.message.includes('Authentication')) {
     return 'Authentication failed. Please log in and try again';
-  } else {
-    return 'An unexpected error occurred. Please try again later';
   }
+  return 'An unexpected error occurred. Please try again later';
 };

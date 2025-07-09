@@ -777,7 +777,7 @@ export const validators = {
 export const environment = {
   isBrowser: typeof window !== 'undefined',
   isNode: typeof process !== 'undefined' && process.versions?.node,
-  isWorker: typeof importScripts === 'function',
+  isWorker: typeof window === 'undefined' && typeof importScripts === 'function',
   isMobile: typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent),
   isTouch: typeof window !== 'undefined' && 'ontouchstart' in window,
   isDarkMode: typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches,

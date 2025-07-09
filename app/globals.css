@@ -463,8 +463,31 @@ body::before {
   
   /* NEON CARD - 3D Glowing */
   .card-neon {
-    @apply card;
-    border: 2px solid var(--neon-purple);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 2px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s var(--ease-elastic);
+    will-change: transform, box-shadow;
+    transform-style: preserve-3d;
+    box-shadow: var(--shadow-3d);
+    
+    /* Enhanced Shimmer Effect */
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -150%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transform: skewX(-25deg);
+      transition: left 0.75s ease-in-out;
+      z-index: 1;
+    }
     
     &:hover {
       box-shadow: 
@@ -476,7 +499,6 @@ body::before {
   
   /* FLOATING CARD - Levitation 3D */
   .card-floating {
-    @apply card;
     box-shadow: var(--shadow-floating);
   }
   
@@ -511,7 +533,6 @@ body::before {
 
   /* HOLOGRAPHIC CARD - Future Tech 3D */
   .card-holographic {
-    @apply card;
     background: var(--gradient-holographic);
     background-size: 200% 200%;
     border: 2px solid rgba(255, 255, 255, 0.2);
@@ -558,7 +579,6 @@ body::before {
   
   /* CRYSTAL CARD - Prismatic 3D */
   .card-crystal {
-    @apply card;
     background: var(--gradient-crystal);
     position: relative;
     
@@ -608,12 +628,15 @@ body::before {
   }
   
   .text-gradient {
-    @apply bg-clip-text text-transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
     background-image: var(--gradient-cosmic);
   }
   
   .text-holographic {
-    @apply bg-clip-text text-transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
     background-image: var(--gradient-holographic);
     background-size: 200% 200%;
   }
